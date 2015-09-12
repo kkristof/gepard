@@ -285,7 +285,7 @@ typedef std::map<const Float, SegmentList*> SegmentTree;
 
 class SegmentApproximator {
 public:
-    SegmentApproximator(float epsilon = 1)
+    SegmentApproximator(Float epsilon = 1)
         : _epsilon(epsilon)
     {
     }
@@ -307,6 +307,7 @@ public:
 
     inline void splitSegments();
     void printSegements();
+
 private:
     SegmentTree _segments;
     float _epsilon;
@@ -341,9 +342,10 @@ public:
         NonZero,
     };
 
-    TrapezoidTessallator(Path* path, FillRule fillRule = NonZero)
+    TrapezoidTessallator(Path* path, FillRule fillRule = NonZero, int antiAliasingLevel = 16)
         : _path(path)
         , _fillRule(fillRule)
+        , _antiAliasingLevel(antiAliasingLevel)
     {
     }
 
@@ -353,6 +355,7 @@ public:
 private:
     Path* _path;
     FillRule _fillRule;
+    int _antiAliasingLevel;
 };
 
 } // namespace gepard
