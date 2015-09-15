@@ -153,16 +153,24 @@ struct BoundingBox {
     {
     }
 
+    void stretchX(Float x)
+    {
+        if (x < _minX)
+            _minX = x;
+        if (x > _maxX)
+            _maxX = x;
+    }
+    void stretchY(Float y)
+    {
+        if (y < _minY)
+            _minY = y;
+        if (y > _maxY)
+            _maxY = y;
+    }
     void stretch(FloatPoint p)
     {
-        if (p._x < _minX)
-            _minX = p._x;
-        if (p._y < _minY)
-            _minY = p._y;
-        if (p._x > _maxX)
-            _maxX = p._x;
-        if (p._y > _maxY)
-            _maxY = p._y;
+        stretchX(p._x);
+        stretchY(p._y);
     }
 
     Float _minX, _minY, _maxX, _maxY;
