@@ -74,6 +74,11 @@ public:
     void arc(float x, float y, float radius, float startAngle, float endAngle, bool anticlockwise = true);
     void rect(float x, float y, float w, float h);
 
+	// 9. Drawing rectangles to the canvas (W3-2DContext-2015)
+	void clearRect(float x, float y, float w, float h);
+	void fillRect(float x, float y, float w, float h);
+	void strokeRect(float x, float y, float w, float h);
+
     // 11. Drawing paths to the canvas (W3-2DContext-2015)
     void beginPath();
     void fill(const std::string& fillRule = "nonzero");

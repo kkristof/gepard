@@ -39,16 +39,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <EGL/egl.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
+
+#ifdef USE_GLES2
+
+#include <EGL/egl.h>
 
 #define GL_GLEXT_PROTOTYPES 1
 
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+
+// TODO: check this include
 //#include <dlfcn.h>
+#endif
 
 #define ASSERT0(condition, message) \
     if (!(condition)) {\

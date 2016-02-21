@@ -142,4 +142,19 @@ void Gepard::setFillColor(const int red, const int green, const int blue, const 
     _fillColorRGBA = Color(red, green, blue, alpha);
 }
 
+void Gepard::clearRect(float x, float y, float w, float h)
+{
+	// TODO: Unimplemented
+}
+
+void Gepard::fillRect(float x, float y, float w, float h)
+{
+	// TODO: Unimplemented
+
+}
+void Gepard::strokeRect(float x, float y, float w, float h)
+{
+	// TODO: Unimplemented
+}
+
 } // namespace gepard
