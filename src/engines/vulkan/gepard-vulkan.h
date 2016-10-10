@@ -45,7 +45,6 @@ class Surface;
 
 namespace vulkan {
 
-
 class GepardVulkan {
 public:
     explicit GepardVulkan(GepardContext&);

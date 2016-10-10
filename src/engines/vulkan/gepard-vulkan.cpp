@@ -38,7 +38,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#endif
+#endif // VK_USE_PLATFORM_XLIB_KHR
 
 namespace gepard {
 namespace vulkan {
@@ -137,7 +137,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
-    VkBufferCreateInfo vertexBufferInfo = {
+    const VkBufferCreateInfo vertexBufferInfo = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,   // VkStructureType        sType;
         nullptr,                                // const void*            pNext;
         0,                                      // VkBufferCreateFlags    flags;
@@ -154,10 +154,11 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     _vk.vkCreateBuffer(_device, &vertexBufferInfo, _allocator, &vertexBuffer);
 
+    // Upload vertex data.
     {
         VkMemoryRequirements memoryRequirements;
         _vk.vkGetBufferMemoryRequirements(_device, vertexBuffer, &memoryRequirements);
-        VkMemoryAllocateInfo allocationInfo = {
+        const VkMemoryAllocateInfo allocationInfo = {
             VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,                                         // VkStructureType    sType;
             nullptr,                                                                        // const void*        pNext;
             memoryRequirements.size,                                                        // VkDeviceSize       allocationSize;
@@ -172,7 +173,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
         std::memcpy(data, vertexData, (VkDeviceSize)sizeof(vertexData));
 
-        VkMappedMemoryRange range = {
+        const VkMappedMemoryRange range = {
             VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,  // VkStructureType    sType;
             nullptr,                                // const void*        pNext;
             vertexBufferMemory,                     // VkDeviceMemory     memory;
@@ -184,7 +185,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         _vk.vkUnmapMemory(_device, vertexBufferMemory);
     }
 
-    VkBufferCreateInfo indexBufferInfo = {
+    const VkBufferCreateInfo indexBufferInfo = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,   // VkStructureType        sType;
         nullptr,                                // const void*            pNext;
         0,                                      // VkBufferCreateFlags    flags;
@@ -200,10 +201,11 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     _vk.vkCreateBuffer(_device, &indexBufferInfo, _allocator, &indexBuffer);
 
+    // Upload index data.
     {
         VkMemoryRequirements memoryRequirements;
         _vk.vkGetBufferMemoryRequirements(_device, indexBuffer, &memoryRequirements);
-        VkMemoryAllocateInfo allocationInfo = {
+        const VkMemoryAllocateInfo allocationInfo = {
             VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,                                         // VkStructureType    sType;
             nullptr,                                                                        // const void*        pNext;
             memoryRequirements.size,                                                        // VkDeviceSize       allocationSize;
@@ -218,7 +220,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
         std::memcpy(data, rectIndicies, (VkDeviceSize)sizeof(rectIndicies));
 
-        VkMappedMemoryRange range = {
+        const VkMappedMemoryRange range = {
             VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,  // VkStructureType    sType;
             nullptr,                                // const void*        pNext;
             indexBufferMemory,                      // VkDeviceMemory     memory;
@@ -243,7 +245,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         std::ifstream fragmentInput( "src/engines/vulkan/shaders/frag.spv", std::ios::binary );
         std::vector<char> fragmentCode((std::istreambuf_iterator<char>(fragmentInput)), (std::istreambuf_iterator<char>()));
 
-        VkShaderModuleCreateInfo vertexModulInfo = {
+        const VkShaderModuleCreateInfo vertexModulInfo = {
             VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,            // VkStructureType              sType;
             nullptr,                                                // const void*                  pNext;
             0,                                                      // VkShaderModuleCreateFlags    flags;
@@ -252,7 +254,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         };
         _vk.vkCreateShaderModule(_device, &vertexModulInfo, _allocator, &vertex);
 
-        VkShaderModuleCreateInfo fragmentModulInfo = {
+        const VkShaderModuleCreateInfo fragmentModulInfo = {
             VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,            // VkStructureType              sType;
             nullptr,                                                // const void*                  pNext;
             0,                                                      // VkShaderModuleCreateFlags    flags;
@@ -262,7 +264,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         _vk.vkCreateShaderModule(_device, &fragmentModulInfo, _allocator, &fragment);
     }
 
-    VkPipelineShaderStageCreateInfo stages[] = {
+    const VkPipelineShaderStageCreateInfo stages[] = {
         {
             VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,    // VkStructureType                     sType;
             nullptr,                                                // const void*                         pNext;
@@ -283,7 +285,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         }
     };
 
-    VkVertexInputBindingDescription bindingDescription = {
+    const VkVertexInputBindingDescription bindingDescription = {
         0u,                             // uint32_t             binding;
         2 * (4 * sizeof(float)),        // uint32_t             stride;
         VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
@@ -304,7 +306,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         },
     };
 
-    VkPipelineVertexInputStateCreateInfo vertexInputState = {
+    const VkPipelineVertexInputStateCreateInfo vertexInputState = {
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,  // VkStructureType                             sType;
         nullptr,                                                    // const void*                                 pNext;
         0,                                                          // VkPipelineVertexInputStateCreateFlags       flags;
@@ -314,7 +316,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         vertexAttributeDescriptions,                                // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
     };
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
+    const VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,    // VkStructureType                          sType
         nullptr,                                                        // const void*                              pNext
         0,                                                              // VkPipelineInputAssemblyStateCreateFlags  flags
@@ -348,7 +350,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         }
     };
 
-    VkPipelineViewportStateCreateInfo viewportState = {
+    const VkPipelineViewportStateCreateInfo viewportState = {
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,  // VkStructureType                       sType;
         nullptr,                                                // const void*                           pNext;
         0,                                                      // VkPipelineViewportStateCreateFlags    flags;
@@ -358,7 +360,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         scissors,                                               // const VkRect2D*                       pScissors;
     };
 
-    VkPipelineRasterizationStateCreateInfo rasterizationState = {
+    const VkPipelineRasterizationStateCreateInfo rasterizationState = {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, // VkStructureType                            sType;
         nullptr,                                                    // const void*                                pNext;
         0,                                                          // VkPipelineRasterizationStateCreateFlags    flags;
@@ -374,7 +376,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         1.0f,                                                       // float                                      lineWidth;
     };
 
-    VkPipelineMultisampleStateCreateInfo multisampleState = {
+    const VkPipelineMultisampleStateCreateInfo multisampleState = {
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,   // VkStructureType                          sType;
         nullptr,                                                    // const void*                              pNext;
         0,                                                          // VkPipelineMultisampleStateCreateFlags    flags;
@@ -386,7 +388,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         VK_FALSE,                                                   // VkBool32                                 alphaToOneEnable;
     };
 
-    VkPipelineColorBlendAttachmentState color_blend_attachment_state = {
+    const VkPipelineColorBlendAttachmentState colorBlendAttachmentState = {
         VK_TRUE,                                                                                                    // VkBool32                 blendEnable;
         VK_BLEND_FACTOR_SRC_ALPHA,                                                                                  // VkBlendFactor            srcColorBlendFactor;
         VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,                                                                        // VkBlendFactor            dstColorBlendFactor;
@@ -397,14 +399,14 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT   // VkColorComponentFlags    colorWriteMask;
     };
 
-    VkPipelineColorBlendStateCreateInfo colorBlendState = {
+    const VkPipelineColorBlendStateCreateInfo colorBlendState = {
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,   // VkStructureType                               sType;
         nullptr,                                                    // const void*                                   pNext;
         0,                                                          // VkPipelineColorBlendStateCreateFlags          flags;
         VK_FALSE,                                                   // VkBool32                                      logicOpEnable;
         VK_LOGIC_OP_COPY,                                           // VkLogicOp                                     logicOp;
         1u,                                                         // uint32_t                                      attachmentCount;
-        &color_blend_attachment_state,                              // const VkPipelineColorBlendAttachmentState*    pAttachments;
+        &colorBlendAttachmentState,                                 // const VkPipelineColorBlendAttachmentState*    pAttachments;
         {
             0.0f,   // float R
             0.0f,   // float G
@@ -414,7 +416,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
     };
 
     VkPipelineLayout layout;
-    VkPipelineLayoutCreateInfo layoutCreateInfo = {
+    const VkPipelineLayoutCreateInfo layoutCreateInfo = {
           VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,  // VkStructureType                sType
           nullptr,                                        // const void                    *pNext
           0,                                              // VkPipelineLayoutCreateFlags    flags
@@ -426,7 +428,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     _vk.vkCreatePipelineLayout(_device, &layoutCreateInfo, _allocator, &layout);
 
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
+    const VkGraphicsPipelineCreateInfo pipelineCreateInfo = {
         VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,    // VkStructureType                                  sType;
         nullptr,                                            // const void*                                      pNext;
         0,                                                  // VkPipelineCreateFlags                            flags;
@@ -454,9 +456,9 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     // Drawing
 
-    VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
 
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
        nullptr,                                     // const void*                              pNext;
        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
@@ -465,9 +467,9 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
 
-    VkClearValue clearValue = { 0.0, 0.0, 0.0, 0.0 };
+    const VkClearValue clearValue = { 0.0, 0.0, 0.0, 0.0 };
 
-    VkRenderPassBeginInfo renderPassInfo {
+    const VkRenderPassBeginInfo renderPassInfo {
         VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,   // VkStructureType        sType;
         nullptr,                                    // const void*            pNext;
         _renderPass,                                // VkRenderPass           renderPass;
@@ -483,14 +485,14 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
     _vk.vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &vertexBufferOffset);
     _vk.vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    uint32_t indexCount = sizeof(rectIndicies) / sizeof(uint32_t);
+    const uint32_t indexCount = sizeof(rectIndicies) / sizeof(uint32_t);
     _vk.vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
 
     _vk.vkCmdEndRenderPass(commandBuffer);
 
     _vk.vkEndCommandBuffer(commandBuffer);
 
-    VkSubmitInfo submitInfo = {
+    const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
         nullptr,                        // const void*                    pNext;
         0,                              // uint32_t                       waitSemaphoreCount;
@@ -505,7 +507,7 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
     VkQueue queue;
     _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
 
-    VkFenceCreateInfo fenceInfo = {
+    const VkFenceCreateInfo fenceInfo = {
         VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType       sType;
         nullptr,                                // const void*           pNext;
         0,                                      // VkFenceCreateFlags    flags;
@@ -516,7 +518,8 @@ void GepardVulkan::fillRect(Float x, Float y, Float w, Float h)
 
     _vk.vkQueueSubmit(queue, 1, &submitInfo, fence);
 
-    uint64_t timeout = (uint64_t)16 * 1000000; // 16 ms
+    const uint64_t oneMiliSec = 1000000;
+    const uint64_t timeout = (uint64_t)16 * oneMiliSec; // 16 ms
     _vk.vkWaitForFences(_device, 1, &fence, VK_TRUE, timeout);
 
     if(_context.surface->getDisplay()) {
@@ -549,7 +552,7 @@ void GepardVulkan::createDefaultInstance()
         VK_KHR_SURFACE_EXTENSION_NAME,
 #ifdef VK_USE_PLATFORM_XLIB_KHR
         VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
-#endif
+#endif // VK_USE_PLATFORM_XLIB_KHR
     };
 
     // todo: find better default arguments
@@ -572,10 +575,9 @@ void GepardVulkan::chooseDefaultPhysicalDevice()
 {
     uint32_t deviceCount;
     _vk.vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
-    GD_ASSERT(deviceCount);
+    GD_ASSERT(deviceCount && "Couldn't find any device!");
     GD_LOG3("Physical devices found: " << deviceCount);
     std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
-    GD_ASSERT(deviceCount && "Couldn't find any device!");
 
     std::vector<VkPhysicalDevice> integratedDevices;
     std::vector<VkPhysicalDevice> discreteDevices;
@@ -590,8 +592,7 @@ void GepardVulkan::chooseDefaultPhysicalDevice()
            if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
                integratedDevices.push_back(physicalDevices[i]);
                continue;
-           }
-           else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+           } else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
                discreteDevices.push_back(physicalDevices[i]);
                continue;
            }
@@ -638,7 +639,7 @@ void GepardVulkan::chooseDefaultDevice()
     VkResult vkResult;
     const float queuePriorities[] = { 1.0f };
 
-    VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
+    const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType             sType;
         nullptr,                                    // const void*                 pNext;
         0u,                                         // VkDeviceQueueCreateFlags    flags;
@@ -652,10 +653,11 @@ void GepardVulkan::chooseDefaultDevice()
 
     enabledInstanceLayers.push_back("VK_LAYER_LUNARG_standard_validation");
 
-    if (_context.surface->getDisplay())
+    if (_context.surface->getDisplay()) {
         enabledInstanceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    }
 
-    VkDeviceCreateInfo deviceCreateInfo = {
+    const VkDeviceCreateInfo deviceCreateInfo = {
         VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,       // VkStructureType                  sType;
         nullptr,                                    // const void*                      pNext;
         0u,                                         // VkDeviceCreateFlags              flags;
@@ -674,7 +676,7 @@ void GepardVulkan::chooseDefaultDevice()
 
 void GepardVulkan::createCommandPool()
 {
-    VkCommandPoolCreateInfo commandPoolCreateInfo = {
+    const VkCommandPoolCreateInfo commandPoolCreateInfo = {
         VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,         // VkStructureType          sType;
         nullptr,                                            // const void*              pNext;
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,    // VkCommandPoolCreateFlags flags;
@@ -689,7 +691,7 @@ void GepardVulkan::createCommandPool()
 
 void GepardVulkan::allocatePrimaryCommandBuffer()
 {
-    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
+    const VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, // VkStructureType         sType;
         nullptr,                                        // const void*             pNext;
         _commandPool,                                   // VkCommandPool           commandPool;
@@ -709,7 +711,7 @@ void GepardVulkan::createDefaultRenderPass()
 {
     VkResult vkResult;
 
-    VkAttachmentDescription attachmentDescription = {
+    const VkAttachmentDescription attachmentDescription = {
         0u,                                         // VkAttachmentDescriptionFlags flags;
         _imageFormat,                               // VkFormat                     format;
         VK_SAMPLE_COUNT_1_BIT,                      // VkSampleCountFlagBits        samples;
@@ -721,12 +723,12 @@ void GepardVulkan::createDefaultRenderPass()
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,   // VkImageLayout                finalLayout;
     };
 
-    VkAttachmentReference colorAttachment = {
+    const VkAttachmentReference colorAttachment = {
         0u,                                         // uint32_t         attachment;
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,   // VkImageLayout    layout;
     };
 
-    VkSubpassDescription subpassDescription = {
+    const VkSubpassDescription subpassDescription = {
         0u,                                 // VkSubpassDescriptionFlags       flags;
         VK_PIPELINE_BIND_POINT_GRAPHICS,    // VkPipelineBindPoint             pipelineBindPoint;
         0u,                                 // uint32_t                        inputAttachmentCount;
@@ -739,7 +741,7 @@ void GepardVulkan::createDefaultRenderPass()
         nullptr,                            // const uint32_t*                 pPreserveAttachments;
     };
 
-    VkRenderPassCreateInfo renderPassCreateInfo = {
+    const VkRenderPassCreateInfo renderPassCreateInfo = {
         VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,  // VkStructureType                   sType;
         nullptr,                                    // const void*                       pNext;
         0u,                                         // VkRenderPassCreateFlags           flags;
@@ -759,13 +761,13 @@ void GepardVulkan::createSurfaceImage()
 {
     VkResult vkResult;
 
-    VkExtent3D imageSize = {
+    const VkExtent3D imageSize = {
         _context.surface->width(),  // uint32_t    width;
         _context.surface->height(), // uint32_t    height;
         1,                          // uint32_t    depth;
     };
 
-    VkImageCreateInfo imageCreateInfo = {
+    const VkImageCreateInfo imageCreateInfo = {
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,        // VkStructureType          sType;
         nullptr,                                    // const void*              pNext;
         0u,                                         // VkImageCreateFlags       flags;
@@ -791,7 +793,7 @@ void GepardVulkan::createSurfaceImage()
     VkMemoryRequirements memoryRequirements;
     _vk.vkGetImageMemoryRequirements(_device, _surfaceImage, &memoryRequirements);
 
-    VkMemoryAllocateInfo memoryAllocateInfo = {
+    const VkMemoryAllocateInfo memoryAllocateInfo = {
         VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,                                         // VkStructureType    sType;
         nullptr,                                                                        // const void*        pNext;
         memoryRequirements.size,                                                        // VkDeviceSize       allocationSize;
@@ -809,20 +811,20 @@ void GepardVulkan::createSurfaceImage()
 
     // Clear the surface image
 
-    VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
 
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
        nullptr,                                     // const void*                              pNext;
        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
        nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
     };
 
-    VkClearColorValue clearColor = {
+    const VkClearColorValue clearColor = {
         0.0, 0.0, 0.0, 0.0
     };
 
-    VkImageSubresourceRange range = {
+    const VkImageSubresourceRange range = {
         VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
         0u,                         // uint32_t              baseMipLevel;
         1u,                         // uint32_t              levelCount;
@@ -836,7 +838,7 @@ void GepardVulkan::createSurfaceImage()
 
     _vk.vkEndCommandBuffer(commandBuffer);
 
-    VkSubmitInfo submitInfo = {
+    const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
         nullptr,                        // const void*                    pNext;
         0,                              // uint32_t                       waitSemaphoreCount;
@@ -851,7 +853,7 @@ void GepardVulkan::createSurfaceImage()
     VkQueue queue;
     _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
 
-    VkFenceCreateInfo fenceInfo = {
+    const VkFenceCreateInfo fenceInfo = {
         VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType       sType;
         nullptr,                                // const void*           pNext;
         0,                                      // VkFenceCreateFlags    flags;
@@ -862,7 +864,8 @@ void GepardVulkan::createSurfaceImage()
 
     _vk.vkQueueSubmit(queue, 1, &submitInfo, fence);
 
-    uint64_t timeout = (uint64_t)16 * 1000000; // 16 ms
+    const uint64_t oneMiliSec = 1000000;
+    const uint64_t timeout = (uint64_t)16 * oneMiliSec; // 16 ms
     _vk.vkWaitForFences(_device, 1, &fence, VK_TRUE, timeout);
     _vk.vkDestroyFence(_device, fence, _allocator);
 }
@@ -871,7 +874,7 @@ void GepardVulkan::createDefaultFrameBuffer()
 {
     VkResult vkResult;
 
-    VkImageViewCreateInfo imageViewCreateInfo = {
+    const VkImageViewCreateInfo imageViewCreateInfo = {
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,   // VkStructureType            sType;
         nullptr,                                    // const void*                pNext;
         0,                                          // VkImageViewCreateFlags     flags;
@@ -899,7 +902,7 @@ void GepardVulkan::createDefaultFrameBuffer()
     std::vector<VkImageView> attachments;
     attachments.push_back(_frameBufferColorAttachmentImageView);
 
-    VkFramebufferCreateInfo frameBufferCreateInfo = {
+    const VkFramebufferCreateInfo frameBufferCreateInfo = {
         VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,  // VkStructureType             sType;
         nullptr,                                    // const void*                 pNext;
         0u,                                         // VkFramebufferCreateFlags    flags;
@@ -937,7 +940,7 @@ void GepardVulkan::createSwapChain()
     // Todo: check if this could be moved in to gepard-xsurface
     XSync((Display*)_context.surface->getDisplay(), false);
 
-    VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {
+    const VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {
         VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR, // VkStructureType                sType;
         nullptr,                                        // const void*                    pNext;
         0,                                              // VkXlibSurfaceCreateFlagsKHR    flags;
@@ -946,7 +949,7 @@ void GepardVulkan::createSwapChain()
     };
 
     _vk.vkCreateXlibSurfaceKHR(_instance, &surfaceCreateInfo, _allocator, &_wsiSurface);
-#endif
+#endif // VK_USE_PLATFORM_XLIB_KHR
     GD_ASSERT(_wsiSurface);
 
     uint32_t surfaceFormatCount;
@@ -956,16 +959,15 @@ void GepardVulkan::createSwapChain()
     _vk.vkGetPhysicalDeviceSurfaceFormatsKHR(_physicalDevice, _wsiSurface, &surfaceFormatCount, surfaceFormats.data());
 
     VkFormat swapchainFormat;
-    if ((surfaceFormatCount == 1) && (surfaceFormats[0].format == VK_FORMAT_UNDEFINED))
+    if ((surfaceFormatCount == 1) && (surfaceFormats[0].format == VK_FORMAT_UNDEFINED)) {
         swapchainFormat = VK_FORMAT_R8G8B8_UNORM;
-    else
-    {
+    } else {
         GD_ASSERT(surfaceFormatCount >= 1);
         swapchainFormat = surfaceFormats[0].format;
     }
-    VkColorSpaceKHR swapchainColorSpace = surfaceFormats[0].colorSpace;
+    const VkColorSpaceKHR swapchainColorSpace = surfaceFormats[0].colorSpace;
 
-    VkExtent2D imageSize = {
+    const VkExtent2D imageSize = {
         _context.surface->width(),  // uint32_t    width;
         _context.surface->height(), // uint32_t    height;
     };
@@ -994,7 +996,7 @@ void GepardVulkan::createSwapChain()
         }
     }
 
-    VkSwapchainCreateInfoKHR swapChainCreateInfo = {
+    const VkSwapchainCreateInfoKHR swapChainCreateInfo = {
         VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,    // VkStructureType                  sType;
         nullptr,                                        // const void*                      pNext;
         0,                                              // VkSwapchainCreateFlagsKHR        flags;
@@ -1025,7 +1027,7 @@ void GepardVulkan::createSwapChain()
 
 void GepardVulkan::presentImage()
 {
-    VkFenceCreateInfo fenceInfo = {
+    const VkFenceCreateInfo fenceInfo = {
         VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType       sType;
         nullptr,                                // const void*           pNext;
         0,                                      // VkFenceCreateFlags    flags;
@@ -1033,7 +1035,8 @@ void GepardVulkan::presentImage()
     VkFence fence;
     _vk.vkCreateFence(_device, &fenceInfo, _allocator, &fence);
 
-    uint64_t timeout = (uint64_t)16 * 1000000; // 16 ms
+    const uint64_t oneMiliSec = 1000000;
+    const uint64_t timeout = (uint64_t)16 * oneMiliSec; // 16 ms
 
     uint32_t imageIndex;
     _vk.vkAcquireNextImageKHR(_device, _wsiSwapChain, timeout, VK_NULL_HANDLE, fence, &imageIndex);
@@ -1041,16 +1044,16 @@ void GepardVulkan::presentImage()
     VkQueue queue;
     _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
 
-    VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
 
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
        nullptr,                                     // const void*                              pNext;
        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
        nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
     };
 
-    VkImageSubresourceLayers subresource = {
+    const VkImageSubresourceLayers subresource = {
         VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
         0u,                         // uint32_t              mipLevel;
         0u,                         // uint32_t              baseArrayLayer;
@@ -1077,7 +1080,7 @@ void GepardVulkan::presentImage()
         },              // VkOffset3D                  dstOffsets[2];
     };
 
-    VkImageSubresourceRange subresourceRange = {
+    const VkImageSubresourceRange subresourceRange = {
         VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
         0u,                         // uint32_t              baseMipLevel;
         1u,                         // uint32_t              levelCount;
@@ -1085,7 +1088,7 @@ void GepardVulkan::presentImage()
         1u,                         // uint32_t              layerCount;
     };
 
-    VkImageMemoryBarrier preCopyBarrierFBO = {
+    const VkImageMemoryBarrier preCopyBarrierFBO = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
         nullptr,                                    // const void*                pNext;
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,       // VkAccessFlags              srcAccessMask;
@@ -1098,7 +1101,7 @@ void GepardVulkan::presentImage()
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
-    VkImageMemoryBarrier postCopyBarrierFBO = {
+    const VkImageMemoryBarrier postCopyBarrierFBO = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
         nullptr,                                    // const void*                pNext;
         VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              srcAccessMask;
@@ -1111,7 +1114,7 @@ void GepardVulkan::presentImage()
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
-    VkImageMemoryBarrier preCopyBarrierWSI = {
+    const VkImageMemoryBarrier preCopyBarrierWSI = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType            sType;
         nullptr,                                // const void*                pNext;
         VK_ACCESS_MEMORY_READ_BIT,              // VkAccessFlags              srcAccessMask;
@@ -1124,7 +1127,7 @@ void GepardVulkan::presentImage()
         subresourceRange,                       // VkImageSubresourceRange    subresourceRange;
     };
 
-    VkImageMemoryBarrier postCopyBarrierWSI = {
+    const VkImageMemoryBarrier postCopyBarrierWSI = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType            sType;
         nullptr,                                // const void*                pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags              srcAccessMask;
@@ -1137,12 +1140,12 @@ void GepardVulkan::presentImage()
         subresourceRange,                       // VkImageSubresourceRange    subresourceRange;
     };
 
-    VkImageMemoryBarrier preCopyBarriers[] = {
+    const VkImageMemoryBarrier preCopyBarriers[] = {
         preCopyBarrierFBO,
         preCopyBarrierWSI,
     };
 
-    VkImageMemoryBarrier postCopyBarriers[] = {
+    const VkImageMemoryBarrier postCopyBarriers[] = {
         postCopyBarrierFBO,
         postCopyBarrierWSI,
     };
@@ -1153,7 +1156,7 @@ void GepardVulkan::presentImage()
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 2, postCopyBarriers);
     _vk.vkEndCommandBuffer(commandBuffer);
 
-    VkSubmitInfo submitInfo = {
+    const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
         nullptr,                        // const void*                    pNext;
         0,                              // uint32_t                       waitSemaphoreCount;
@@ -1168,7 +1171,7 @@ void GepardVulkan::presentImage()
     _vk.vkQueueSubmit(queue, 1, &submitInfo, fence);
     _vk.vkWaitForFences(_device, 1, &fence, VK_TRUE, timeout);
 
-    VkPresentInfoKHR presentInfo = {
+    const VkPresentInfoKHR presentInfo = {
         VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, // VkStructureType          sType;
         nullptr,                            // const void*              pNext;
         0u,                                 // uint32_t                 waitSemaphoreCount;
@@ -1189,13 +1192,13 @@ void GepardVulkan::readImage()
 {
     VkBuffer buffer;
     VkDeviceMemory bufferAlloc;
-    VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
     const uint32_t width = _context.surface->width();
     const uint32_t height = _context.surface->width();
-    VkDeviceSize dataSize = width * height * 4; // r8g8b8a8 format
+    const VkDeviceSize dataSize = width * height * 4; // r8g8b8a8 format
 
     // Create destination buffer
-    VkBufferCreateInfo bufferInfo = {
+    const VkBufferCreateInfo bufferInfo = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,   // VkStructureType        sType;
         nullptr,                                // const void*            pNext;
         0u,                                     // VkBufferCreateFlags    flags;
@@ -1210,7 +1213,7 @@ void GepardVulkan::readImage()
 
     VkMemoryRequirements memoryRequirements;
     _vk.vkGetBufferMemoryRequirements(_device, buffer, &memoryRequirements);
-    VkMemoryAllocateInfo allocationInfo = {
+    const VkMemoryAllocateInfo allocationInfo = {
         VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,                                         // VkStructureType    sType;
         nullptr,                                                                        // const void*        pNext;
         memoryRequirements.size,                                                        // VkDeviceSize       allocationSize;
@@ -1220,7 +1223,7 @@ void GepardVulkan::readImage()
     _vk.vkAllocateMemory(_device, &allocationInfo, _allocator, &bufferAlloc);
     _vk.vkBindBufferMemory(_device, buffer, bufferAlloc, 0);
 
-    VkImageSubresourceRange subresourceRange = {
+    const VkImageSubresourceRange subresourceRange = {
         VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
         0u,                         // uint32_t              baseMipLevel;
         1u,                         // uint32_t              levelCount;
@@ -1228,7 +1231,7 @@ void GepardVulkan::readImage()
         1u,                         // uint32_t              layerCount;
     };
 
-    VkImageMemoryBarrier preImageBarrier = {
+    const VkImageMemoryBarrier preImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
         nullptr,                                    // const void*                pNext;
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,       // VkAccessFlags              srcAccessMask;
@@ -1241,7 +1244,7 @@ void GepardVulkan::readImage()
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
-    VkImageMemoryBarrier postImageBarrier = {
+    const VkImageMemoryBarrier postImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
         nullptr,                                    // const void*                pNext;
         VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              srcAccessMask;
@@ -1254,7 +1257,7 @@ void GepardVulkan::readImage()
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
-    VkBufferMemoryBarrier bufferBarrier = {
+    const VkBufferMemoryBarrier bufferBarrier = {
         VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,    // VkStructureType    sType;
         nullptr,                                    // const void*        pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags      srcAccessMask;
@@ -1266,14 +1269,14 @@ void GepardVulkan::readImage()
         dataSize,                                   // VkDeviceSize       size;
     };
 
-    VkImageSubresourceLayers imageSubresource = {
+    const VkImageSubresourceLayers imageSubresource = {
         VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
         0u,                         // uint32_t              mipLevel;
         0u,                         // uint32_t              baseArrayLayer;
         1u,                         // uint32_t              baseArrayLayer;
     };
 
-    VkBufferImageCopy copyRegion = {
+    const VkBufferImageCopy copyRegion = {
         0u,                 // VkDeviceSize                bufferOffset;
         width,              // uint32_t                    bufferRowLength;
         height,             // uint32_t                    bufferImageHeight;
@@ -1286,7 +1289,7 @@ void GepardVulkan::readImage()
         },                  // VkExtent3D                  imageExtent;
     };
 
-    VkCommandBufferBeginInfo commandBufferBeginInfo = {
+    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
        nullptr,                                     // const void*                              pNext;
        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
@@ -1300,7 +1303,7 @@ void GepardVulkan::readImage()
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 1, &bufferBarrier, 1, &postImageBarrier);
     _vk.vkEndCommandBuffer(commandBuffer);
 
-    VkSubmitInfo submitInfo = {
+    const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
         nullptr,                        // const void*                    pNext;
         0,                              // uint32_t                       waitSemaphoreCount;
@@ -1315,7 +1318,7 @@ void GepardVulkan::readImage()
     VkQueue queque;
     _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queque);
 
-    VkFenceCreateInfo fenceInfo = {
+    const VkFenceCreateInfo fenceInfo = {
         VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType       sType;
         nullptr,                                // const void*           pNext;
         0,                                      // VkFenceCreateFlags    flags;
@@ -1326,13 +1329,14 @@ void GepardVulkan::readImage()
 
     _vk.vkQueueSubmit(queque, 1, &submitInfo, fence);
 
-    uint64_t timeout = (uint64_t)16 * 1000000; // 16 ms
+    const uint64_t oneMiliSec = 1000000;
+    const uint64_t timeout = (uint64_t)16 * oneMiliSec; // 16 ms
     _vk.vkWaitForFences(_device, 1, &fence, VK_TRUE, timeout);
 
     void* data;
     _vk.vkMapMemory(_device, bufferAlloc, 0, dataSize, 0, &data);
 
-    VkMappedMemoryRange range = {
+    const VkMappedMemoryRange range = {
         VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,  // VkStructureType    sType;
         nullptr,                                // const void*        pNext;
         bufferAlloc,                            // VkDeviceMemory     memory;

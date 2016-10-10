@@ -63,7 +63,7 @@ void GepardVulkanInterface::loadGlobalFunctions()
 #undef GD_VK_LOAD_FUNCTION
 }
 
-void GepardVulkanInterface::loadInstanceFunctions(VkInstance instance)
+void GepardVulkanInterface::loadInstanceFunctions(const VkInstance instance)
 {
 #define GD_VK_LOAD_FUNCTION(fun)\
     fun = (PFN_##fun) vkGetInstanceProcAddr (instance, #fun); \
@@ -82,7 +82,7 @@ void GepardVulkanInterface::loadInstanceFunctions(VkInstance instance)
     GD_VK_LOAD_FUNCTION(vkDestroySurfaceKHR);
 #ifdef VK_USE_PLATFORM_XLIB_KHR
     GD_VK_LOAD_FUNCTION(vkCreateXlibSurfaceKHR);
-#endif
+#endif // VK_USE_PLATFORM_XLIB_KHR
     GD_VK_LOAD_FUNCTION(vkGetPhysicalDeviceSurfaceFormatsKHR);
     GD_VK_LOAD_FUNCTION(vkGetPhysicalDeviceSurfaceCapabilitiesKHR);
     GD_VK_LOAD_FUNCTION(vkGetPhysicalDeviceSurfacePresentModesKHR);
@@ -90,7 +90,7 @@ void GepardVulkanInterface::loadInstanceFunctions(VkInstance instance)
 #undef GD_VK_LOAD_FUNCTION
 }
 
-void GepardVulkanInterface::loadDeviceFunctions(VkDevice device)
+void GepardVulkanInterface::loadDeviceFunctions(const VkDevice device)
 {
 #define GD_VK_LOAD_FUNCTION(fun)\
     fun = (PFN_##fun) vkGetDeviceProcAddr (device, #fun); \
@@ -162,8 +162,6 @@ void GepardVulkanInterface::loadDeviceFunctions(VkDevice device)
 
 #undef GD_VK_LOAD_FUNCTION
 }
-
-
 
 } // namespace vulkan
 

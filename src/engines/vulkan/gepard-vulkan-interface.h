@@ -44,8 +44,8 @@ public:
     ~GepardVulkanInterface();
 
     void loadGlobalFunctions();
-    void loadInstanceFunctions(VkInstance instance);
-    void loadDeviceFunctions(VkDevice device);
+    void loadInstanceFunctions(const VkInstance instance);
+    void loadDeviceFunctions(const VkDevice device);
 
 #define GD_VK_DECLARE_FUNCTION(fun) PFN_##fun fun
 
@@ -67,7 +67,7 @@ public:
     GD_VK_DECLARE_FUNCTION(vkDestroySurfaceKHR);
 #ifdef VK_USE_PLATFORM_XLIB_KHR
     GD_VK_DECLARE_FUNCTION(vkCreateXlibSurfaceKHR);
-#endif
+#endif // VK_USE_PLATFORM_XLIB_KHR
     GD_VK_DECLARE_FUNCTION(vkGetPhysicalDeviceSurfaceFormatsKHR);
     GD_VK_DECLARE_FUNCTION(vkGetPhysicalDeviceSurfaceCapabilitiesKHR);
     GD_VK_DECLARE_FUNCTION(vkGetPhysicalDeviceSurfacePresentModesKHR);
