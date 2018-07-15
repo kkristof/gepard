@@ -548,6 +548,107 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
 void GepardVulkan::drawImage(Image imagedata, Float sx, Float sy, Float sw, Float sh, Float dx, Float dy, Float dw, Float dh)
 {
     GD_LOG2("drawImage " << sx << " " << sy << " " << sw << " " << sh << " " << dx << " " << dy << " " << dw << " " << dh);
+    VkResult vkResult;
+    const uint32_t width = imagedata.width();
+    const uint32_t height = imagedata.height();
+    VkBuffer buffer;
+    VkDeviceMemory bufferAlloc;
+    VkMemoryRequirements bufferMemoryRequirements;
+    const VkDeviceSize bufferSize = width * height * sizeof(uint32_t); // r8g8b8a8 format
+    createBuffer(buffer, bufferAlloc, bufferMemoryRequirements, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+    void* bufferPtr;
+    _vk.vkMapMemory(_device, bufferAlloc, 0, bufferMemoryRequirements.size, 0, &bufferPtr);
+    memcpy(bufferPtr, imagedata.data().data(), bufferSize);
+    _vk.vkUnmapMemory(_device, bufferAlloc);
+
+    VkImage image;
+    VkDeviceMemory imageMemory;
+    VkMemoryRequirements imageMemoryRequirements;
+
+    // TODO: implement funiction for image creation
+    const VkExtent3D imageSize = {
+        width,  // uint32_t    width;
+        height, // uint32_t    height;
+        1u,     // uint32_t    depth;
+    };
+
+    createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
+       VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
+       nullptr,                                     // const void*                              pNext;
+       VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
+       nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
+    };
+
+    VkImageSubresourceLayers subResourceLayers = {
+        VK_IMAGE_ASPECT_COLOR_BIT,  //VkImageAspectFlags    aspectMask;
+        0u,                         //uint32_t              mipLevel;
+        0u,                         //uint32_t              baseArrayLayer;
+        1u,                         //uint32_t              layerCount;
+    };
+
+    VkBufferImageCopy bufferToImage = {
+        0,                      // VkDeviceSize                bufferOffset;
+        0,                      // uint32_t                    bufferRowLength;
+        0,                      // uint32_t                    bufferImageHeight;
+        subResourceLayers,      // VkImageSubresourceLayers    imageSubresource;
+        { 0, 0, 0 },            // VkOffset3D                  imageOffset;
+        {
+            imagedata.width(),
+            imagedata.height(),
+            1u,
+        },                      // VkExtent3D                  imageExtent;
+    };
+
+    const VkImageSubresourceRange subresourceRange = {
+        VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
+        0u,                         // uint32_t              baseMipLevel;
+        1u,                         // uint32_t              levelCount;
+        0u,                         // uint32_t              baseArrayLayer;
+        1u,                         // uint32_t              layerCount;
+    };
+
+    const VkImageMemoryBarrier uploadImageBarrier = {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
+        VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags              srcAccessMask;
+        VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              dstAccessMask;
+        VK_IMAGE_LAYOUT_UNDEFINED,                  // VkImageLayout              oldLayout;
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       // VkImageLayout              newLayout;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
+        image,                                      // VkImage                    image;
+        subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
+    };
+
+    const VkImageMemoryBarrier sampleImageBarrier = {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
+        VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags              srcAccessMask;
+        VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              dstAccessMask;
+        VK_IMAGE_LAYOUT_UNDEFINED,                  // VkImageLayout              oldLayout;
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       // VkImageLayout              newLayout;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
+        image,                                      // VkImage                    image;
+        subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
+    };
+
+    // Update the surface
+    if(_context.surface->getDisplay()) {
+        presentImage();
+    } else if(_context.surface->getBuffer()) {
+        presentToMemoryBuffer();
+    }
+
+    // Clean up
+    _vk.vkFreeMemory(_device, imageMemory, _allocator);
+    _vk.vkFreeMemory(_device, bufferAlloc, _allocator);
+    _vk.vkDestroyImage(_device, image, _allocator);
+    _vk.vkDestroyBuffer(_device, buffer, _allocator);
 }
 
 void GepardVulkan::putImage(Image imagedata, Float dx, Float dy, Float dirtyX, Float dirtyY, Float dirtyWidth, Float dirtyHeight)
