@@ -25,8 +25,14 @@
 
 #include "gepard.h"
 #include "gepard-image.h"
+#include "surfaces/gepard-xsurface.h"
 #include "surfaces/gepard-png-surface.h"
 #include <iostream>
+#include <png.h>
+
+#include <chrono>
+#include <iostream>
+#include <thread>
 
 #define SURFACE_SIZE 600
 
@@ -49,33 +55,189 @@ void fillImage(gepard::Image& image)
 {
     for (int i = 0; i < image.width(); i++) {
         for (int j = 0; j < image.height(); j++) {
-            uint32_t color = 0x7f7f7f7f;
+            uint32_t color = 0xff0000ff;
+            if (i+j > 200)
+                color = 0x22554477;
 
             image.data()[i * image.width() + j] = color;
-            std::cout << image.data()[i * image.width() + j] << std::endl;
         }
     }
 }
 
+std::vector<uint32_t> png_load(const char * file_name, int * width, int * height)
+{
+    // This function was originally written by David Grayson for
+    // https://github.com/DavidEGrayson/ahrs-visualizer
+    std::vector<uint32_t> imageData;
+    png_byte header[8];
+
+    FILE *fp = fopen(file_name, "rb");
+    if (fp == 0)
+    {
+        perror(file_name);
+        return imageData;
+    }
+
+    // read the header
+    fread(header, 1, 8, fp);
+
+    if (png_sig_cmp(header, 0, 8))
+    {
+        fprintf(stderr, "error: %s is not a PNG.\n", file_name);
+        fclose(fp);
+        return imageData;
+    }
+
+    png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png_ptr)
+    {
+        fprintf(stderr, "error: png_create_read_struct returned 0.\n");
+        fclose(fp);
+        return imageData;
+    }
+
+    // create png info struct
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+    if (!info_ptr)
+    {
+        fprintf(stderr, "error: png_create_info_struct returned 0.\n");
+        png_destroy_read_struct(&png_ptr, (png_infopp)NULL, (png_infopp)NULL);
+        fclose(fp);
+        return imageData;
+    }
+
+    // create png info struct
+    png_infop end_info = png_create_info_struct(png_ptr);
+    if (!end_info)
+    {
+        fprintf(stderr, "error: png_create_info_struct returned 0.\n");
+        png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp) NULL);
+        fclose(fp);
+        return imageData;
+    }
+
+    // the code in this if statement gets called if libpng encounters an error
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        fprintf(stderr, "error from libpng\n");
+        png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
+        fclose(fp);
+        return imageData;
+    }
+
+    // init png reading
+    png_init_io(png_ptr, fp);
+
+    // let libpng know you already read the first 8 bytes
+    png_set_sig_bytes(png_ptr, 8);
+
+    // read all the info up to the image data
+    png_read_info(png_ptr, info_ptr);
+
+    // variables to pass to get info
+    int bit_depth, color_type;
+    png_uint_32 temp_width, temp_height;
+
+    // get info about png
+    png_get_IHDR(png_ptr, info_ptr, &temp_width, &temp_height, &bit_depth, &color_type,
+        NULL, NULL, NULL);
+
+    if (width){ *width = temp_width; }
+    if (height){ *height = temp_height; }
+
+    //printf("%s: %lux%lu %d\n", file_name, temp_width, temp_height, color_type);
+
+    if (bit_depth != 8)
+    {
+        fprintf(stderr, "%s: Unsupported bit depth %d.  Must be 8.\n", file_name, bit_depth);
+        return imageData;
+    }
+
+    // Update the png info struct.
+    png_read_update_info(png_ptr, info_ptr);
+
+    // Row size in bytes.
+    int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
+
+    // glTexImage2d requires rows to be 4-byte aligned
+    rowbytes += 3 - ((rowbytes-1) % 4);
+
+    // Allocate the image_data as a big block, to be given to opengl
+    png_byte * image_data = (png_byte *)malloc(rowbytes * temp_height * sizeof(png_byte)+15);
+    if (image_data == NULL)
+    {
+        fprintf(stderr, "error: could not allocate memory for PNG image data\n");
+        png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
+        fclose(fp);
+        return imageData;
+    }
+
+    // row_pointers is for pointing to image_data for reading the png with libpng
+    png_byte ** row_pointers = (png_byte **)malloc(temp_height * sizeof(png_byte *));
+    if (row_pointers == NULL)
+    {
+        fprintf(stderr, "error: could not allocate memory for PNG row pointers\n");
+        png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
+        free(image_data);
+        fclose(fp);
+        return imageData;
+    }
+
+    // set the individual row_pointers to point at the correct offsets of image_data
+    for (unsigned int i = 0; i < temp_height; i++)
+    {
+        row_pointers[temp_height - 1 - i] = image_data + i * rowbytes;
+    }
+
+    // read the png into image_data through row_pointers
+    png_read_image(png_ptr, row_pointers);
+
+    imageData.resize(temp_width * temp_height);
+    std::memcpy(imageData.data(), image_data, temp_width * temp_height * 4);
+
+    return imageData;
+}
+
 int main()
 {
-    gepard::PNGSurface surface(SURFACE_SIZE, SURFACE_SIZE);
+    gepard::XSurface surface(SURFACE_SIZE, SURFACE_SIZE);
     gepard::Gepard gepard(&surface);
 
     generateCheckerBoard(gepard);
 
-    gepard::Image image = gepard.createImageData(200.0, 200.0);
-    fillImage(image);
 
-    std::cout << image.width() << " " << image.height() << std::endl;
-    gepard::Image image2 = gepard.createImageData(image);
-    std::cout << image2.width() << " " << image2.height() << std::endl;
+    int width, height;
+    std::vector<uint32_t> data;
+    data = png_load("sprites_rgba.png", &width, &height);
 
-    gepard.putImageData(image, 100, 100, 10, 10, 50, 50);
+    gepard::Image fillRect(width, height, data);
+    int spriteWidth = 256;
+    int spriteHeight = 256;
+    int offsetX = 0;
+    int offsetY = 0;
 
-    gepard.putImageData(image2, 0, 0);
+    gepard.putImageData(fillRect, 0, 0, offsetX, offsetY, spriteWidth, spriteHeight);
+    auto start = std::chrono::high_resolution_clock::now();
+    XEvent xEvent;
+    while (true) {
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = now - start;
+        if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_seconds).count() > 96) {
+            start = now;
+            offsetX += spriteWidth;
+            if (offsetX >= width)
+                offsetX = 0;
+            gepard.putImageData(fillRect, 0, 0, offsetX, offsetY, spriteWidth, spriteHeight);
+            gepard::Image piece = gepard.getImageData(100, 100, 100, 100);
+            gepard.putImageData(piece, 0, 400);
+        }
 
-    surface.save("image.png");
+        std::this_thread::sleep_for(std::chrono::nanoseconds(1));   // Only for CPU sparing.
+        if (XCheckWindowEvent((Display*)surface.getDisplay(), (Window)surface.getWindow(), KeyPress | ClientMessage, &xEvent)) {
+            break;
+        }
+    }
+
+    //surface.save("image.png");
 
     return 0;
 }
