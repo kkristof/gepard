@@ -130,7 +130,8 @@ namespace vulkan {
     FUNC(vkCreateSampler); \
     FUNC(vkDestroySampler); \
     FUNC(vkUpdateDescriptorSets); \
-    FUNC(vkCmdBindDescriptorSets);
+    FUNC(vkCmdBindDescriptorSets); \
+    FUNC(vkCmdPushConstants);
 
 class GepardVulkanInterface {
 public:

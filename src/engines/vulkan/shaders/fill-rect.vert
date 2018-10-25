@@ -1,12 +1,17 @@
 # version 450
 
-layout(location = 0) in vec4 position;
+layout(location = 0) in vec2 position;
 layout(location = 1) in vec4 color;
+layout (push_constant) uniform _matrices
+{
+    mat3 mvp;
+} matrices;
 
 layout(location = 0) out vec4 fillColor;
 
 void main()
 {
-    gl_Position = position;
+    vec3 tPosition = matrices.mvp * vec3(position.xy, 1.0);
+    gl_Position = vec4(tPosition.xyz, 1.0);
     fillColor = color;
 }

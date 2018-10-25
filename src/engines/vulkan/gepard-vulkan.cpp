@@ -148,11 +148,24 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     const float bottom = (float)((2.0 * (y + h) / (float)_context.surface->height()) - 1.0);
 
     const float vertexData[] = {
-        left, top, 1.0, 1.0, r, g, b, a,
-        right, top, 1.0, 1.0, r, g, b, a,
-        left, bottom, 1.0, 1.0, r, g, b, a,
-        right, bottom, 1.0, 1.0, r, g, b, a,
+        left, top,
+        right, top,
+        left, bottom,
+        right, bottom,
     };
+
+    const float instanceData[] = {
+        r, g, b, a,
+    };
+
+    // For mat3 the elements need to be aligned to 4 float per row
+    const float pushConstants[] = {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+    };
+
+    const uint32_t pushConstantsSize = sizeof(pushConstants);
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
@@ -160,9 +173,16 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkDeviceMemory vertexBufferMemory;
     VkMemoryRequirements vertexMemoryRequirements;
     VkDeviceSize vertexBufferOffset = 0;
+    VkBuffer instanceBuffer;
+    VkDeviceMemory instanceBufferMemory;
+    VkMemoryRequirements instanceMemoryRequirements;
+    VkDeviceSize instanceBufferOffset = 0;
 
     createBuffer(vertexBuffer, vertexBufferMemory, vertexMemoryRequirements, (VkDeviceSize)sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     uploadToDeviceMemory(vertexBufferMemory, (void*)vertexData, vertexMemoryRequirements.size, vertexBufferOffset);
+
+    createBuffer(instanceBuffer, instanceBufferMemory, instanceMemoryRequirements, (VkDeviceSize)sizeof(instanceData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    uploadToDeviceMemory(instanceBufferMemory, (void*)instanceData, instanceMemoryRequirements.size, instanceBufferOffset);
 
     VkBuffer indexBuffer;
     VkDeviceMemory indexBufferMemory;
@@ -179,24 +199,31 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     createShaderModule(vertex, fillRectVert,  sizeof(fillRectVert));
     createShaderModule(fragment, fillRectFrag, sizeof(fillRectFrag));
 
-    const VkVertexInputBindingDescription bindingDescription = {
-        0u,                             // uint32_t             binding;
-        2 * (4 * sizeof(float)),        // uint32_t             stride;
-        VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
+    const VkVertexInputBindingDescription bindingDescription[] = {
+        {
+            0u,                             // uint32_t             binding;
+            2 * sizeof(float),              // uint32_t             stride;
+            VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
+        },
+        {
+            1u,                             // uint32_t             binding;
+            4 * sizeof(float),              // uint32_t             stride;
+            VK_VERTEX_INPUT_RATE_INSTANCE,  // VkVertexInputRate    inputRate;
+        },
     };
 
     const VkVertexInputAttributeDescription vertexAttributeDescriptions[] = {
         {
             0u,                             // uint32_t location
             0u,                             // uint32_t binding
-            VK_FORMAT_R32G32B32A32_SFLOAT,  // VkFormat format
+            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
             0u,                             // uint32_t offset
         },
         {
             1u,                             // uint32_t location
-            0u,                             // uint32_t binding
+            1u,                             // uint32_t binding
             VK_FORMAT_R32G32B32A32_SFLOAT,  // VkFormat format
-            sizeof(float) * 4,              // uint32_t offset
+            0u,                             // uint32_t offset
         },
     };
 
@@ -204,23 +231,29 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,  // VkStructureType                             sType;
         nullptr,                                                    // const void*                                 pNext;
         0,                                                          // VkPipelineVertexInputStateCreateFlags       flags;
-        1u,                                                         // uint32_t                                    vertexBindingDescriptionCount;
-        &bindingDescription,                                        // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
+        2u,                                                         // uint32_t                                    vertexBindingDescriptionCount;
+        bindingDescription,                                         // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
         2u,                                                         // uint32_t                                    vertexAttributeDescriptionCount;
         vertexAttributeDescriptions,                                // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
+    };
+
+    const VkPushConstantRange pushConstantRange = {
+        VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
+        0u,                         // uint32_t              offset;
+        pushConstantsSize,          // uint32_t              size;
     };
 
     VkPipelineLayout layout;
     VkPipeline pipeline;
 
     const VkPipelineLayoutCreateInfo layoutCreateInfo = {
-          VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,  // VkStructureType                sType
-          nullptr,                                        // const void*                    pNext
-          0,                                              // VkPipelineLayoutCreateFlags    flags
-          0u,                                             // uint32_t                       setLayoutCount
-          nullptr,                                        // const VkDescriptorSetLayout*   pSetLayouts
-          0u,                                             // uint32_t                       pushConstantRangeCount
-          nullptr                                         // const VkPushConstantRange*     pPushConstantRanges
+          VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,    // VkStructureType                sType
+          nullptr,                                          // const void*                    pNext
+          0,                                                // VkPipelineLayoutCreateFlags    flags
+          0u,                                               // uint32_t                       setLayoutCount
+          nullptr,                                          // const VkDescriptorSetLayout*   pSetLayouts
+          1u,                                               // uint32_t                       pushConstantRangeCount
+          &pushConstantRange                                // const VkPushConstantRange*     pPushConstantRanges
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
 
@@ -248,10 +281,12 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         &clearValue,                                // const VkClearValue*    pClearValues;
     };
 
+    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants);
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
     _vk.vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &vertexBufferOffset);
+    _vk.vkCmdBindVertexBuffers(commandBuffer, 1, 1, &instanceBuffer, &instanceBufferOffset);
     _vk.vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     const uint32_t indexCount = sizeof(rectIndicies) / sizeof(uint32_t);
@@ -303,9 +338,11 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     _vk.vkDestroyShaderModule(_device, fragment, _allocator);
 
     _vk.vkDestroyBuffer(_device, vertexBuffer, _allocator);
+    _vk.vkDestroyBuffer(_device, instanceBuffer, _allocator);
     _vk.vkDestroyBuffer(_device, indexBuffer, _allocator);
 
     _vk.vkFreeMemory(_device, vertexBufferMemory, _allocator);
+    _vk.vkFreeMemory(_device, instanceBufferMemory, _allocator);
     _vk.vkFreeMemory(_device, indexBufferMemory, _allocator);
 }
 
