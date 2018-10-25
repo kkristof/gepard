@@ -158,11 +158,13 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         r, g, b, a,
     };
 
+    const Float* transform = _context.currentState().transform.data;
+
     // For mat3 the elements need to be aligned to 4 float per row
     const float pushConstants[] = {
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
+        transform[0], transform[2], 0.0, 0.0,
+        transform[1], transform[3], 0.0, 0.0,
+        transform[4], transform[5], 1.0, 0.0,
     };
 
     const uint32_t pushConstantsSize = sizeof(pushConstants);
