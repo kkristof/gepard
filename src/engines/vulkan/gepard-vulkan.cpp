@@ -396,6 +396,17 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
+    const Float* transform = _context.currentState().transform.data;
+
+    // For mat3 the elements need to be aligned to 4 float per row
+    const float pushConstants[] = {
+        transform[0], transform[2], 0.0, 0.0,
+        transform[1], transform[3], 0.0, 0.0,
+        transform[4], transform[5], 1.0, 0.0,
+    };
+
+    const uint32_t pushConstantsSize = sizeof(pushConstants);
+
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkMemoryRequirements vertexMemoryRequirements;
@@ -546,14 +557,20 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     _vk.vkUpdateDescriptorSets(_device, 1u, &writeDescriptorSet, 0u, nullptr);
 
+    const VkPushConstantRange pushConstantRange = {
+        VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
+        0u,                         // uint32_t              offset;
+        pushConstantsSize,          // uint32_t              size;
+    };
+
     const VkPipelineLayoutCreateInfo layoutCreateInfo = {
           VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,  // VkStructureType                sType
           nullptr,                                        // const void*                    pNext
           0,                                              // VkPipelineLayoutCreateFlags    flags
           1u,                                             // uint32_t                       setLayoutCount
           &descriptorSetLayout,                           // const VkDescriptorSetLayout*   pSetLayouts
-          0u,                                             // uint32_t                       pushConstantRangeCount
-          nullptr                                         // const VkPushConstantRange*     pPushConstantRanges
+          1u,                                             // uint32_t                       pushConstantRangeCount
+          &pushConstantRange                              // const VkPushConstantRange*     pPushConstantRanges
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
 
@@ -637,11 +654,11 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
         &clearValue,                                // const VkClearValue*    pClearValues;
     };
 
-    // TODO: check if we need preCopy barrier
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &uploadImageBarrier);
     _vk.vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferToImage);
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &sampleImageBarrier);
 
+    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants);
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
