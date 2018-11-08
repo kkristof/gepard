@@ -91,6 +91,7 @@ private:
     void createSurfaceImage();
     void createDefaultFrameBuffer();
     uint32_t getMemoryTypeIndex(const VkMemoryRequirements memoryRequirements, const VkMemoryPropertyFlags properties);
+    void createWsiSurface();
     void createSwapChain();
     void presentImage();
     void presentToMemoryBuffer();

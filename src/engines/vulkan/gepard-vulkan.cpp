@@ -944,6 +944,9 @@ void GepardVulkan::createDefaultInstance()
 
 void GepardVulkan::chooseDefaultPhysicalDevice()
 {
+    if (_context.surface->getDisplay()) {
+        createWsiSurface();
+    }
     uint32_t deviceCount;
     _vk.vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
     GD_ASSERT(deviceCount && "Couldn't find any device!");
@@ -955,19 +958,19 @@ void GepardVulkan::chooseDefaultPhysicalDevice()
     std::vector<VkPhysicalDevice> otherDevices;
     _vk.vkEnumeratePhysicalDevices(_instance, &deviceCount, physicalDevices.data());
     for (auto& physicalDevice: physicalDevices) {
-           VkPhysicalDeviceProperties deviceProperties;
-           _vk.vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-           GD_LOG3("device name " << deviceProperties.deviceName);
-           GD_LOG3("api version " << (deviceProperties.apiVersion >> 22) << "."
-               << ((deviceProperties.apiVersion >> 12) & 0x1ff) << "."  << (deviceProperties.apiVersion & 0x7ff));
-           if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
-               integratedDevices.push_back(physicalDevice);
-               continue;
-           } else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-               discreteDevices.push_back(physicalDevice);
-               continue;
-           }
-           otherDevices.push_back(physicalDevice);
+        VkPhysicalDeviceProperties deviceProperties;
+        _vk.vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+        GD_LOG3("device name " << deviceProperties.deviceName);
+        GD_LOG3("api version " << (deviceProperties.apiVersion >> 22) << "."
+           << ((deviceProperties.apiVersion >> 12) & 0x1ff) << "."  << (deviceProperties.apiVersion & 0x7ff));
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+           integratedDevices.push_back(physicalDevice);
+           continue;
+        } else if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+           discreteDevices.push_back(physicalDevice);
+           continue;
+        }
+        otherDevices.push_back(physicalDevice);
     }
 
     if (chooseGraphicsQueue(discreteDevices))
@@ -990,6 +993,13 @@ bool GepardVulkan::chooseGraphicsQueue(const std::vector<VkPhysicalDevice>& devi
         std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueCount);
         _vk.vkGetPhysicalDeviceQueueFamilyProperties(device, &queueCount, queueFamilyProperties.data());
         for (uint32_t j = 0; j < queueCount; j++) {
+            if (_context.surface->getDisplay()) {
+                VkBool32 wsiSupported = false;
+                _vk.vkGetPhysicalDeviceSurfaceSupportKHR(device, j, _wsiSurface, &wsiSupported);
+                if (!wsiSupported) {
+                    continue;
+                }
+            }
             if (queueFamilyProperties[j].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 _physicalDevice = device;
                 _queueFamilyIndex = j;
@@ -1268,7 +1278,7 @@ uint32_t GepardVulkan::getMemoryTypeIndex(const VkMemoryRequirements memoryRequi
     GD_CRASH("No feasible memory type index!");
 }
 
-void GepardVulkan::createSwapChain()
+void GepardVulkan::createWsiSurface()
 {
     GD_ASSERT(_context.surface->getDisplay());
     GD_ASSERT(!_wsiSurface);
@@ -1302,6 +1312,11 @@ void GepardVulkan::createSwapChain()
 #else
     GD_CRASH("Unimplemented WSI platform!");
 #endif // VK_USE_PLATFORM_XLIB_KHR
+    GD_ASSERT(_wsiSurface);
+}
+
+void GepardVulkan::createSwapChain()
+{
     GD_ASSERT(_wsiSurface);
 
     uint32_t surfaceFormatCount;

@@ -55,7 +55,8 @@ namespace vulkan {
     FUNC(vkDestroySurfaceKHR); \
     FUNC(vkGetPhysicalDeviceSurfaceFormatsKHR); \
     FUNC(vkGetPhysicalDeviceSurfaceCapabilitiesKHR); \
-    FUNC(vkGetPhysicalDeviceSurfacePresentModesKHR);
+    FUNC(vkGetPhysicalDeviceSurfacePresentModesKHR); \
+    FUNC(vkGetPhysicalDeviceSurfaceSupportKHR);
 
 // Device level vulkan functions
 #define GD_VK_DEVICE_FUNTION_LIST(FUNC) \
