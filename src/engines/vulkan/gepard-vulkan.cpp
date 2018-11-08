@@ -158,16 +158,9 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         r, g, b, a,
     };
 
-    const Float* transform = _context.currentState().transform.data;
-
-    // For mat3 the elements need to be aligned to 4 float per row
-    const float pushConstants[] = {
-        transform[0], transform[2], 0.0, 0.0,
-        transform[1], transform[3], 0.0, 0.0,
-        transform[4], transform[5], 1.0, 0.0,
-    };
-
-    const uint32_t pushConstantsSize = sizeof(pushConstants);
+    std::vector<float> transformation = getTransformationMatrix();
+    const float *pushConstants = transformation.data();
+    const uint32_t pushConstantsSize = transformation.size() * sizeof(float);
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
@@ -396,16 +389,9 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
-    const Float* transform = _context.currentState().transform.data;
-
-    // For mat3 the elements need to be aligned to 4 float per row
-    const float pushConstants[] = {
-        transform[0], transform[2], 0.0, 0.0,
-        transform[1], transform[3], 0.0, 0.0,
-        transform[4], transform[5], 1.0, 0.0,
-    };
-
-    const uint32_t pushConstantsSize = sizeof(pushConstants);
+    std::vector<float> transformation = getTransformationMatrix();
+    const float *pushConstants = transformation.data();
+    const uint32_t pushConstantsSize = transformation.size() * sizeof(float);
 
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
@@ -2037,6 +2023,20 @@ void GepardVulkan::updateSurface()
     } else if(_context.surface->getBuffer()) {
         presentToMemoryBuffer();
     }
+}
+
+std::vector<float> GepardVulkan::getTransformationMatrix()
+{
+    const Float* transform = _context.currentState().transform.data;
+    float width = (float)_context.surface->width() / 2.0f;
+    float height = (float)_context.surface->height() / 2.0f;
+    // For mat3 the elements need to be aligned to 4 float per row
+    std::vector<float> transformation = {
+        (float) transform[0], (float) transform[2], 0.0, 0.0,
+        (float) transform[1], (float) transform[3], 0.0, 0.0,
+        (float) transform[4] / width, (float) transform[5] / height, 1.0, 0.0,
+    };
+    return transformation;
 }
 
 } // namespace vulkan

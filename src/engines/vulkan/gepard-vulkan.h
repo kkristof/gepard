@@ -115,6 +115,7 @@ private:
 
     void submitAndWait(const VkCommandBuffer commandBuffer);
     void updateSurface();
+    std::vector<float> getTransformationMatrix();
 };
 
 // TODO: create a header for these constants
