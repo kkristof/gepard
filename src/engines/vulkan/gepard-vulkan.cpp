@@ -142,10 +142,10 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     const float b = _context.currentState().fillColor.b;
     const float a = _context.currentState().fillColor.a;
 
-    const float left = (float)((2.0 * x / (float)_context.surface->width()) - 1.0);
-    const float right = (float)((2.0 * (x + w) / (float)_context.surface->width()) - 1.0);
-    const float top = (float)((2.0 * y / (float)_context.surface->height()) - 1.0);
-    const float bottom = (float)((2.0 * (y + h) / (float)_context.surface->height()) - 1.0);
+    const float left = (float) x;
+    const float right = (float) (x + w);
+    const float top = (float) y;
+    const float bottom = (float) (y + h);
 
     const float vertexData[] = {
         left, top,
@@ -158,9 +158,10 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         r, g, b, a,
     };
 
-    std::vector<float> transformation = getTransformationMatrix();
-    const float *pushConstants = transformation.data();
-    const uint32_t pushConstantsSize = transformation.size() * sizeof(float);
+    std::vector<float> pushConstants = getTransformationMatrix();
+    pushConstants.push_back(_context.surface->width());
+    pushConstants.push_back(_context.surface->height());
+    const uint32_t pushConstantsSize = pushConstants.size() * sizeof(float);
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
@@ -276,7 +277,7 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         &clearValue,                                // const VkClearValue*    pClearValues;
     };
 
-    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants);
+    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
@@ -375,10 +376,10 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     const float texTop = static_cast<float>(sy / imagedata.height());
     const float texBottom = static_cast<float>((sy + sh) / imagedata.height());
     // TODO: create utility function for this
-    const float left = static_cast<float>((2.0 * dx / _context.surface->width()) - 1.0);
-    const float right = static_cast<float>((2.0 * (dx + dw) / _context.surface->width()) - 1.0);
-    const float top = static_cast<float>((2.0 * dy / _context.surface->height()) - 1.0);
-    const float bottom = static_cast<float>((2.0 * (dy + dh) / _context.surface->height()) - 1.0);
+    const float left = static_cast<float>(dx);
+    const float right = static_cast<float>(dx + dw);
+    const float top = static_cast<float>(dy);
+    const float bottom = static_cast<float>(dy + dh);
 
     const float vertexData[] = {
         left, top, texLeft, texTop,
@@ -389,9 +390,10 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     const uint32_t rectIndicies[] = {0, 1, 2, 2, 1, 3};
 
-    std::vector<float> transformation = getTransformationMatrix();
-    const float *pushConstants = transformation.data();
-    const uint32_t pushConstantsSize = transformation.size() * sizeof(float);
+    std::vector<float> pushConstants = getTransformationMatrix();
+    pushConstants.push_back(_context.surface->width());
+    pushConstants.push_back(_context.surface->height());
+    const uint32_t pushConstantsSize = pushConstants.size() * sizeof(float);
 
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
@@ -644,7 +646,7 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     _vk.vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferToImage);
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &sampleImageBarrier);
 
-    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants);
+    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
@@ -2043,13 +2045,11 @@ void GepardVulkan::updateSurface()
 std::vector<float> GepardVulkan::getTransformationMatrix()
 {
     const Float* transform = _context.currentState().transform.data;
-    float width = (float)_context.surface->width() / 2.0f;
-    float height = (float)_context.surface->height() / 2.0f;
     // For mat3 the elements need to be aligned to 4 float per row
     std::vector<float> transformation = {
-        (float) transform[0], (float) transform[2], 0.0, 0.0,
-        (float) transform[1], (float) transform[3], 0.0, 0.0,
-        (float) transform[4] / width, (float) transform[5] / height, 1.0, 0.0,
+        (float) transform[0], (float) transform[1], 0.0, 0.0,
+        (float) transform[2], (float) transform[3], 0.0, 0.0,
+        (float) transform[4], (float) transform[5], 1.0, 0.0,
     };
     return transformation;
 }
