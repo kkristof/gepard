@@ -51,6 +51,7 @@ set(GLES2_SOURCES
 )
 
 set(VULKAN_SOURCES
+    engines/vulkan/gepard-vulkan-container.cpp
     engines/vulkan/gepard-vulkan-interface.cpp
     engines/vulkan/gepard-vulkan.cpp
 )

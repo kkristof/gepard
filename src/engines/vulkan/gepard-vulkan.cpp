@@ -26,6 +26,7 @@
 #include "gepard-vulkan.h"
 
 #include "gepard-float.h"
+#include "gepard-vulkan-container.h"
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -140,6 +141,8 @@ GepardVulkan::~GepardVulkan()
 
 void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const Float h)
 {
+    GepardVulkanContainer container(_vk, _device, _allocator);
+
     // Vertex data setup
     const float r = _context.currentState().fillColor.r;
     const float g = _context.currentState().fillColor.g;
@@ -179,9 +182,11 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkDeviceSize instanceBufferOffset = 0;
 
     createBuffer(vertexBuffer, vertexBufferMemory, vertexMemoryRequirements, (VkDeviceSize)sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    container.addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
     uploadToDeviceMemory(vertexBufferMemory, (void*)vertexData, vertexMemoryRequirements.size, vertexBufferOffset);
 
     createBuffer(instanceBuffer, instanceBufferMemory, instanceMemoryRequirements, (VkDeviceSize)sizeof(instanceData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    container.addElement(new GepardVkBufferElement(instanceBuffer, instanceBufferMemory));
     uploadToDeviceMemory(instanceBufferMemory, (void*)instanceData, instanceMemoryRequirements.size, instanceBufferOffset);
 
     VkBuffer indexBuffer;
@@ -189,6 +194,7 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkMemoryRequirements indexMemoryRequirements;
 
     createBuffer(indexBuffer, indexBufferMemory, indexMemoryRequirements, (VkDeviceSize)sizeof(rectIndicies), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    container.addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
     uploadToDeviceMemory(indexBufferMemory, (void*)rectIndicies, indexMemoryRequirements.size);
 
     // Pipeline creation
@@ -329,14 +335,6 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
 
     _vk.vkDestroyPipeline(_device, pipeline, _allocator);
     _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
-
-    _vk.vkDestroyBuffer(_device, vertexBuffer, _allocator);
-    _vk.vkDestroyBuffer(_device, instanceBuffer, _allocator);
-    _vk.vkDestroyBuffer(_device, indexBuffer, _allocator);
-
-    _vk.vkFreeMemory(_device, vertexBufferMemory, _allocator);
-    _vk.vkFreeMemory(_device, instanceBufferMemory, _allocator);
-    _vk.vkFreeMemory(_device, indexBufferMemory, _allocator);
 }
 
 void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Float sh, Float dx, Float dy, Float dw, Float dh)
@@ -345,11 +343,13 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     VkResult vkResult;
     const uint32_t width = imagedata.width();
     const uint32_t height = imagedata.height();
+    GepardVulkanContainer container(_vk, _device, _allocator);
     VkBuffer buffer;
     VkDeviceMemory bufferAlloc;
     VkMemoryRequirements bufferMemoryRequirements;
     const VkDeviceSize bufferSize = width * height * sizeof(uint32_t); // r8g8b8a8 format
     createBuffer(buffer, bufferAlloc, bufferMemoryRequirements, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    container.addElement(new GepardVkBufferElement(buffer, bufferAlloc));
     uploadToDeviceMemory(bufferAlloc, imagedata.data().data(), bufferSize);
 
     VkImage image;
@@ -365,9 +365,9 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     createImageView(imageView, image);
+    container.addElement(new GepardVkImageElement(image, imageView, imageMemory));
 
     // Vertex data setup
-
     const float texLeft = static_cast<float>(sx / imagedata.width());
     const float texRight = static_cast<float>((sx + sw) / imagedata.width());
     const float texTop = static_cast<float>(sy / imagedata.height());
@@ -398,6 +398,7 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     VkDeviceSize vertexBufferOffset = 0;
 
     createBuffer(vertexBuffer, vertexBufferMemory, vertexMemoryRequirements, (VkDeviceSize)sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    container.addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
     uploadToDeviceMemory(vertexBufferMemory, (void*)vertexData, vertexMemoryRequirements.size, vertexBufferOffset);
 
     VkBuffer indexBuffer;
@@ -405,11 +406,10 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     VkMemoryRequirements indexMemoryRequirements;
 
     createBuffer(indexBuffer, indexBufferMemory, indexMemoryRequirements, (VkDeviceSize)sizeof(rectIndicies), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    container.addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
     uploadToDeviceMemory(indexBufferMemory, rectIndicies, indexMemoryRequirements.size);
 
     // Pipeline creation
-    // TODO: use proper descriptors
-
     VkShaderModule vertex = _shaderModules["imageVertex"];
     VkShaderModule fragment = _shaderModules["imageFragment"];
 
@@ -668,17 +668,6 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     _vk.vkDestroyPipeline(_device, pipeline, _allocator);
     _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
-    _vk.vkDestroyImageView(_device, imageView, _allocator);
-
-    _vk.vkFreeMemory(_device, vertexBufferMemory, _allocator);
-    _vk.vkFreeMemory(_device, indexBufferMemory, _allocator);
-    _vk.vkFreeMemory(_device, imageMemory, _allocator);
-    _vk.vkFreeMemory(_device, bufferAlloc, _allocator);
-
-    _vk.vkDestroyBuffer(_device, vertexBuffer, _allocator);
-    _vk.vkDestroyBuffer(_device, indexBuffer, _allocator);
-    _vk.vkDestroyImage(_device, image, _allocator);
-    _vk.vkDestroyBuffer(_device, buffer, _allocator);
 }
 
 void GepardVulkan::putImage(Image& imagedata, Float dx, Float dy, Float dirtyX, Float dirtyY, Float dirtyWidth, Float dirtyHeight)
