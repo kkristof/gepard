@@ -91,6 +91,7 @@ GepardVulkan::GepardVulkan(GepardContext& context)
     GD_LOG2(" - Default frame buffer is created");
     if (_context.surface->getDisplay())
         createSwapChain();
+    compileShaderModules();
 }
 
 GepardVulkan::~GepardVulkan()
@@ -116,6 +117,9 @@ GepardVulkan::~GepardVulkan()
     }
     for (auto& allocation: _memoryAllocations) {
         _vk.vkFreeMemory(_device, allocation, _allocator);
+    }
+    for (auto& shader: _shaderModules) {
+        _vk.vkDestroyShaderModule(_device, shader.second, _allocator);
     }
     if (_commandPool) {
         _vk.vkDestroyCommandPool(_device, _commandPool, _allocator);
@@ -188,12 +192,8 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     uploadToDeviceMemory(indexBufferMemory, (void*)rectIndicies, indexMemoryRequirements.size);
 
     // Pipeline creation
-
-    VkShaderModule vertex;
-    VkShaderModule fragment;
-
-    createShaderModule(vertex, fillRectVert,  sizeof(fillRectVert));
-    createShaderModule(fragment, fillRectFrag, sizeof(fillRectFrag));
+    VkShaderModule vertex = _shaderModules["fillRectVertex"];
+    VkShaderModule fragment = _shaderModules["fillRectFragment"];
 
     const VkVertexInputBindingDescription bindingDescription[] = {
         {
@@ -330,9 +330,6 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     _vk.vkDestroyPipeline(_device, pipeline, _allocator);
     _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
 
-    _vk.vkDestroyShaderModule(_device, vertex, _allocator);
-    _vk.vkDestroyShaderModule(_device, fragment, _allocator);
-
     _vk.vkDestroyBuffer(_device, vertexBuffer, _allocator);
     _vk.vkDestroyBuffer(_device, instanceBuffer, _allocator);
     _vk.vkDestroyBuffer(_device, indexBuffer, _allocator);
@@ -413,11 +410,8 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     // Pipeline creation
     // TODO: use proper descriptors
 
-    VkShaderModule vertex;
-    VkShaderModule fragment;
-
-    createShaderModule(vertex, imageVert,  sizeof(imageVert));
-    createShaderModule(fragment, imageFrag, sizeof(imageFrag));
+    VkShaderModule vertex = _shaderModules["imageVertex"];
+    VkShaderModule fragment = _shaderModules["imageFragment"];
 
     const VkVertexInputBindingDescription bindingDescription = {
         0u,                             // uint32_t             binding;
@@ -674,10 +668,6 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     _vk.vkDestroyPipeline(_device, pipeline, _allocator);
     _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
-
-    _vk.vkDestroyShaderModule(_device, vertex, _allocator);
-    _vk.vkDestroyShaderModule(_device, fragment, _allocator);
-
     _vk.vkDestroyImageView(_device, imageView, _allocator);
 
     _vk.vkFreeMemory(_device, vertexBufferMemory, _allocator);
@@ -2052,6 +2042,14 @@ std::vector<float> GepardVulkan::getTransformationMatrix()
         (float) transform[4], (float) transform[5], 1.0, 0.0,
     };
     return transformation;
+}
+
+void GepardVulkan::compileShaderModules()
+{
+    createShaderModule(_shaderModules["fillRectVertex"], fillRectVert,  sizeof(fillRectVert));
+    createShaderModule(_shaderModules["fillRectFragment"], fillRectFrag, sizeof(fillRectFrag));
+    createShaderModule(_shaderModules["imageVertex"], imageVert,  sizeof(imageVert));
+    createShaderModule(_shaderModules["imageFragment"], imageFrag, sizeof(imageFrag));
 }
 
 } // namespace vulkan

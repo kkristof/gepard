@@ -34,6 +34,7 @@
 #include "gepard-vulkan-interface.h"
 #include "gepard.h"
 
+#include <map>
 #include <vector>
 
 namespace gepard {
@@ -77,6 +78,7 @@ private:
     VkSurfaceKHR _wsiSurface;
     VkSwapchainKHR _wsiSwapChain;
     std::vector<VkImage> _wsiSwapChainImages;
+    std::map<std::string, VkShaderModule> _shaderModules;
 #ifdef VK_USE_PLATFORM_XCB_KHR
     xcb_connection_t* _xcbConnection;
 #endif
@@ -117,6 +119,7 @@ private:
     void submitAndWait(const VkCommandBuffer commandBuffer);
     void updateSurface();
     std::vector<float> getTransformationMatrix();
+    void compileShaderModules();
 };
 
 // TODO: create a header for these constants
