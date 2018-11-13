@@ -319,20 +319,10 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         0,                                      // VkFenceCreateFlags    flags;
     };
 
-    VkFence fence;
-    VkResult vkResult;
-    _vk.vkCreateFence(_device, &fenceInfo, _allocator, &fence);
-    _vk.vkQueueSubmit(queue, 1, &submitInfo, fence);
-    vkResult = _vk.vkWaitForFences(_device, 1, &fence, VK_TRUE, timeout);
-    if (vkResult == VK_TIMEOUT) {
-        GD_LOG1("TIMEOUT!");
-    }
-
+    submitAndWait(commandBuffer);
     updateSurface();
 
     // Clean up
-    _vk.vkDestroyFence(_device, fence, _allocator);
-
     _vk.vkDestroyPipeline(_device, pipeline, _allocator);
     _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
 }
