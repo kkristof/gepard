@@ -258,6 +258,7 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
           &pushConstantRange                                // const VkPushConstantRange*     pPushConstantRanges
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
+    container.addElement(new GepardVKPipelineElement(pipeline, layout));
 
     // Drawing
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
@@ -321,10 +322,6 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
 
     submitAndWait(commandBuffer);
     updateSurface();
-
-    // Clean up
-    _vk.vkDestroyPipeline(_device, pipeline, _allocator);
-    _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
 }
 
 void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Float sh, Float dx, Float dy, Float dw, Float dh)
@@ -545,6 +542,7 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
           &pushConstantRange                              // const VkPushConstantRange*     pPushConstantRanges
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
+    container.addElement(new GepardVKPipelineElement(pipeline, layout));
 
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
@@ -655,9 +653,6 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
 
     _vk.vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, _allocator);
     _vk.vkDestroyDescriptorPool(_device, descriptorPool, _allocator);
-
-    _vk.vkDestroyPipeline(_device, pipeline, _allocator);
-    _vk.vkDestroyPipelineLayout(_device, layout, _allocator);
 }
 
 void GepardVulkan::putImage(Image& imagedata, Float dx, Float dy, Float dirtyX, Float dirtyY, Float dirtyWidth, Float dirtyHeight)

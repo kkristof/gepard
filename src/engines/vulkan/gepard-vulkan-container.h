@@ -65,6 +65,17 @@ private:
     VkDeviceMemory _memory;
 };
 
+class GepardVKPipelineElement : virtual public VkBaseElement
+{
+public:
+    GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout);
+
+    virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator) override;
+private:
+    VkPipeline _pipeline;
+    VkPipelineLayout _layout;
+};
+
 class GepardVulkanContainer
 {
 public:
@@ -77,6 +88,7 @@ private:
     VkDevice& _device;
     VkAllocationCallbacks* _allocator;
 };
+
 
 } // namespace vulkan
 

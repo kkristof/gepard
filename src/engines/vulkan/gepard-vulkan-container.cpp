@@ -81,5 +81,17 @@ void GepardVkBufferElement::destroyElement(GepardVulkanInterface &vk, VkDevice &
     vk.vkDestroyBuffer(device, _buffer, allocator);
 }
 
+GepardVKPipelineElement::GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout)
+    : _pipeline(pipeline)
+    , _layout(layout)
+{
+}
+
+void GepardVKPipelineElement::destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator)
+{
+    vk.vkDestroyPipeline(device, _pipeline, allocator);
+    vk.vkDestroyPipelineLayout(device, _layout, allocator);
+}
+
 } // namespace vulkan
 } // namespace gepard
