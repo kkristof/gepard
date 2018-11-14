@@ -59,14 +59,20 @@ GepardVulkanContainer::GepardVulkanContainer(GepardVulkanInterface &vk, VkDevice
 
 GepardVulkanContainer::~GepardVulkanContainer()
 {
-    for (VkBaseElement* element : _elements) {
-        element->destroyElement(_vk, _device, _allocator);
-    }
+    clear();
 }
 
 void GepardVulkanContainer::addElement(VkBaseElement* element)
 {
     _elements.push_back(element);
+}
+
+void GepardVulkanContainer::clear()
+{
+    for (VkBaseElement* element : _elements) {
+        element->destroyElement(_vk, _device, _allocator);
+    }
+    _elements.clear();
 }
 
 GepardVkBufferElement::GepardVkBufferElement(VkBuffer buffer, VkDeviceMemory memory)

@@ -82,6 +82,7 @@ public:
     GepardVulkanContainer(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks* allocator);
     ~GepardVulkanContainer();
     void addElement(VkBaseElement* element);
+    void clear();
 private:
     std::vector<VkBaseElement*> _elements;
     GepardVulkanInterface& _vk;
