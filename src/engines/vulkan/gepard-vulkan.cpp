@@ -96,6 +96,7 @@ GepardVulkan::GepardVulkan(GepardContext& context)
         createSwapChain();
     compileShaderModules();
     _drawResContainer = new GepardVulkanContainer(_vk, _device, _allocator);
+    createFillRectPipeline();
 }
 
 GepardVulkan::~GepardVulkan()
@@ -198,68 +199,8 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     _drawResContainer->addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
     uploadToDeviceMemory(indexBufferMemory, (void*)rectIndicies, indexMemoryRequirements.size);
 
-    // Pipeline creation
-    VkShaderModule vertex = _shaderModules["fillRectVertex"];
-    VkShaderModule fragment = _shaderModules["fillRectFragment"];
 
-    const VkVertexInputBindingDescription bindingDescription[] = {
-        {
-            0u,                             // uint32_t             binding;
-            2 * sizeof(float),              // uint32_t             stride;
-            VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
-        },
-        {
-            1u,                             // uint32_t             binding;
-            4 * sizeof(float),              // uint32_t             stride;
-            VK_VERTEX_INPUT_RATE_INSTANCE,  // VkVertexInputRate    inputRate;
-        },
-    };
-
-    const VkVertexInputAttributeDescription vertexAttributeDescriptions[] = {
-        {
-            0u,                             // uint32_t location
-            0u,                             // uint32_t binding
-            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
-            0u,                             // uint32_t offset
-        },
-        {
-            1u,                             // uint32_t location
-            1u,                             // uint32_t binding
-            VK_FORMAT_R32G32B32A32_SFLOAT,  // VkFormat format
-            0u,                             // uint32_t offset
-        },
-    };
-
-    const VkPipelineVertexInputStateCreateInfo vertexInputState = {
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,  // VkStructureType                             sType;
-        nullptr,                                                    // const void*                                 pNext;
-        0,                                                          // VkPipelineVertexInputStateCreateFlags       flags;
-        2u,                                                         // uint32_t                                    vertexBindingDescriptionCount;
-        bindingDescription,                                         // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
-        2u,                                                         // uint32_t                                    vertexAttributeDescriptionCount;
-        vertexAttributeDescriptions,                                // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
-    };
-
-    const VkPushConstantRange pushConstantRange = {
-        VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
-        0u,                         // uint32_t              offset;
-        pushConstantsSize,          // uint32_t              size;
-    };
-
-    VkPipelineLayout layout;
-    VkPipeline pipeline;
-
-    const VkPipelineLayoutCreateInfo layoutCreateInfo = {
-          VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,    // VkStructureType                sType
-          nullptr,                                          // const void*                    pNext
-          0,                                                // VkPipelineLayoutCreateFlags    flags
-          0u,                                               // uint32_t                       setLayoutCount
-          nullptr,                                          // const VkDescriptorSetLayout*   pSetLayouts
-          1u,                                               // uint32_t                       pushConstantRangeCount
-          &pushConstantRange                                // const VkPushConstantRange*     pPushConstantRanges
-    };
-    createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
-    _drawResContainer->addElement(new GepardVKPipelineElement(pipeline, layout));
+    //_drawResContainer->addElement(new GepardVKPipelineElement(pipeline, layout));
 
     // Drawing
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
@@ -278,9 +219,9 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         &clearValue,                                // const VkClearValue*    pClearValues;
     };
 
-    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
+    _vk.vkCmdPushConstants(commandBuffer, _fillRectLayout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _fillRectPipeline);
 
     _vk.vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &vertexBufferOffset);
     _vk.vkCmdBindVertexBuffers(commandBuffer, 1, 1, &instanceBuffer, &instanceBufferOffset);
@@ -302,9 +243,6 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         0u,                             // uint32_t                       signalSemaphoreCount;
         nullptr,                        // const VkSemaphore*             pSignalSemaphores;
     };
-
-    VkQueue queue;
-    _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
 
     if (_context.presentMode == Gepard::PresentImmediate) {
         endCommandBuffer(commandBuffer);
@@ -2047,6 +1985,69 @@ void GepardVulkan::endCommandBuffer(VkCommandBuffer commandBuffer)
         _vk.vkEndCommandBuffer(commandBuffer);
         _currentCommandBuffer = 0u;
     }
+}
+
+void GepardVulkan::createFillRectPipeline()
+{
+    // Pipeline creation
+    VkShaderModule vertex = _shaderModules["fillRectVertex"];
+    VkShaderModule fragment = _shaderModules["fillRectFragment"];
+    uint32_t pushConstantsSize = 14 * sizeof(float);
+
+    const VkVertexInputBindingDescription bindingDescription[] = {
+        {
+            0u,                             // uint32_t             binding;
+            2 * sizeof(float),              // uint32_t             stride;
+            VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
+        },
+        {
+            1u,                             // uint32_t             binding;
+            4 * sizeof(float),              // uint32_t             stride;
+            VK_VERTEX_INPUT_RATE_INSTANCE,  // VkVertexInputRate    inputRate;
+        },
+    };
+
+    const VkVertexInputAttributeDescription vertexAttributeDescriptions[] = {
+        {
+            0u,                             // uint32_t location
+            0u,                             // uint32_t binding
+            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
+            0u,                             // uint32_t offset
+        },
+        {
+            1u,                             // uint32_t location
+            1u,                             // uint32_t binding
+            VK_FORMAT_R32G32B32A32_SFLOAT,  // VkFormat format
+            0u,                             // uint32_t offset
+        },
+    };
+
+    const VkPipelineVertexInputStateCreateInfo vertexInputState = {
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,  // VkStructureType                             sType;
+        nullptr,                                                    // const void*                                 pNext;
+        0,                                                          // VkPipelineVertexInputStateCreateFlags       flags;
+        2u,                                                         // uint32_t                                    vertexBindingDescriptionCount;
+        bindingDescription,                                         // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
+        2u,                                                         // uint32_t                                    vertexAttributeDescriptionCount;
+        vertexAttributeDescriptions,                                // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
+    };
+
+    const VkPushConstantRange pushConstantRange = {
+        VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
+        0u,                         // uint32_t              offset;
+        pushConstantsSize,          // uint32_t              size;
+    };
+
+    const VkPipelineLayoutCreateInfo layoutCreateInfo = {
+          VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,    // VkStructureType                sType
+          nullptr,                                          // const void*                    pNext
+          0,                                                // VkPipelineLayoutCreateFlags    flags
+          0u,                                               // uint32_t                       setLayoutCount
+          nullptr,                                          // const VkDescriptorSetLayout*   pSetLayouts
+          1u,                                               // uint32_t                       pushConstantRangeCount
+          &pushConstantRange                                // const VkPushConstantRange*     pPushConstantRanges
+    };
+    createSimplePipeline(_fillRectPipeline, _fillRectLayout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
 }
 
 } // namespace vulkan

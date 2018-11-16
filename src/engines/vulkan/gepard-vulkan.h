@@ -88,6 +88,10 @@ private:
     VkFence _primaryCommandBufferFence;
     VkCommandBuffer _currentCommandBuffer;
 
+    // Experimental
+    VkPipelineLayout _fillRectLayout;
+    VkPipeline _fillRectPipeline;
+
     void createDefaultInstance();
     void chooseDefaultPhysicalDevice();
     void chooseDefaultDevice();
@@ -125,8 +129,10 @@ private:
     void updateSurface();
     std::vector<float> getTransformationMatrix();
     void compileShaderModules();
+    // Experimental
     void beginCommandBuffer(VkCommandBuffer commandBuffer);
     void endCommandBuffer(VkCommandBuffer commandBuffer);
+    void createFillRectPipeline();
 };
 
 // TODO: create a header for these constants
