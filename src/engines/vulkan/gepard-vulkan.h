@@ -29,6 +29,7 @@
 #include "gepard-context.h"
 #include "gepard-float.h"
 #include "gepard-image.h"
+#include "gepard-vulkan-container.h"
 #include "gepard-vulkan-interface.h"
 #include "gepard.h"
 
@@ -53,6 +54,9 @@ public:
     Image getImage(Float sx, Float sy, Float sw, Float sh);
     void fill();
     void stroke();
+
+    // Experimental
+    void finish();
 
 private:
     GepardContext& _context;
@@ -80,6 +84,8 @@ private:
 #ifdef VK_USE_PLATFORM_XCB_KHR
     xcb_connection_t* _xcbConnection;
 #endif
+    GepardVulkanContainer* _drawResContainer;
+    VkFence _primaryCommandBufferFence;
 
     void createDefaultInstance();
     void chooseDefaultPhysicalDevice();

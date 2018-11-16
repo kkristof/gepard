@@ -26,6 +26,7 @@
 #ifndef GEPARD_CONTEXT_H
 #define GEPARD_CONTEXT_H
 
+#include "gepard.h"
 #include "gepard-path.h"
 #include "gepard-state.h"
 #include <vector>
@@ -49,6 +50,7 @@ struct GepardContext {
     Surface* surface;
     std::vector<GepardState> states;
     Path path;
+    Gepard::PresentMode presentMode = Gepard::PresentMode::PresentImmediate;
 };
 
 } // namespace gepard

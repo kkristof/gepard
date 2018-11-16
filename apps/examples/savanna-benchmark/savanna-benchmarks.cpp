@@ -63,6 +63,7 @@ Savanna::React MonkeyMark::start()
     if (gepard)
         return Savanna::React(Savanna::MEM_LEAK);
     gepard = new gepard::Gepard(surface);
+    gepard->setPresentMode(gepard::Gepard::PresentOnDemand);
 
     SN_LOG("MonkeyBenchMark START.");
     return Savanna::pass();
@@ -104,6 +105,7 @@ void MonkeyMark::drawRects()
 
         step();
      }
+    gepard->finish();
 }
 
 // SnakeMark
@@ -128,6 +130,7 @@ Savanna::React SnakeMark::start()
     if (gepard)
         return Savanna::React(Savanna::MEM_LEAK);
     gepard = new gepard::Gepard(surface);
+    gepard->setPresentMode(gepard::Gepard::PresentOnDemand);
 
     SN_LOG("SnakeBenchMark START.");
     return Savanna::pass();
@@ -189,6 +192,7 @@ void SnakeMark::drawRects(int x, int y)
 
         step();
      }
+    gepard->finish();
 }
 
 int SnakeMark::newVelocity(const int x)

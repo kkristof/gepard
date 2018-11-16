@@ -651,6 +651,16 @@ void Gepard::setStrokeColor(const int red, const int green, const int blue, cons
     _engine->setStrokeColor(Color(ratio * float(red), ratio * float(green), ratio * float(blue), float(alpha)));
 }
 
+void Gepard::finish()
+{
+    _engine->finish();
+}
+
+void Gepard::setPresentMode(Gepard::PresentMode mode)
+{
+    _engine->context().presentMode = mode;
+}
+
 // Virtual destructor definition for the abstract Surface class.
 Surface::~Surface()
 {

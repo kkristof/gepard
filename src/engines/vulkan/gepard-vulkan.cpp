@@ -94,6 +94,7 @@ GepardVulkan::GepardVulkan(GepardContext& context)
     if (_context.surface->getDisplay())
         createSwapChain();
     compileShaderModules();
+    _drawResContainer = new GepardVulkanContainer(_vk, _device, _allocator);
 }
 
 GepardVulkan::~GepardVulkan()
@@ -142,8 +143,6 @@ GepardVulkan::~GepardVulkan()
 
 void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const Float h)
 {
-    GepardVulkanContainer container(_vk, _device, _allocator);
-
     // Vertex data setup
     const float r = _context.currentState().fillColor.r;
     const float g = _context.currentState().fillColor.g;
@@ -183,11 +182,11 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkDeviceSize instanceBufferOffset = 0;
 
     createBuffer(vertexBuffer, vertexBufferMemory, vertexMemoryRequirements, (VkDeviceSize)sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    container.addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
+    _drawResContainer->addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
     uploadToDeviceMemory(vertexBufferMemory, (void*)vertexData, vertexMemoryRequirements.size, vertexBufferOffset);
 
     createBuffer(instanceBuffer, instanceBufferMemory, instanceMemoryRequirements, (VkDeviceSize)sizeof(instanceData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    container.addElement(new GepardVkBufferElement(instanceBuffer, instanceBufferMemory));
+    _drawResContainer->addElement(new GepardVkBufferElement(instanceBuffer, instanceBufferMemory));
     uploadToDeviceMemory(instanceBufferMemory, (void*)instanceData, instanceMemoryRequirements.size, instanceBufferOffset);
 
     VkBuffer indexBuffer;
@@ -195,7 +194,7 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkMemoryRequirements indexMemoryRequirements;
 
     createBuffer(indexBuffer, indexBufferMemory, indexMemoryRequirements, (VkDeviceSize)sizeof(rectIndicies), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    container.addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
+    _drawResContainer->addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
     uploadToDeviceMemory(indexBufferMemory, (void*)rectIndicies, indexMemoryRequirements.size);
 
     // Pipeline creation
@@ -259,7 +258,7 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
           &pushConstantRange                                // const VkPushConstantRange*     pPushConstantRanges
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
-    container.addElement(new GepardVKPipelineElement(pipeline, layout));
+    _drawResContainer->addElement(new GepardVKPipelineElement(pipeline, layout));
 
     // Drawing
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
@@ -315,14 +314,11 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkQueue queue;
     _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
 
-    const VkFenceCreateInfo fenceInfo = {
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType       sType;
-        nullptr,                                // const void*           pNext;
-        0,                                      // VkFenceCreateFlags    flags;
-    };
-
     submitAndWait(commandBuffer);
-    updateSurface();
+    _drawResContainer->clear();
+    if (_context.presentMode == Gepard::PresentImmediate) {
+        updateSurface();
+    }
 }
 
 void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Float sh, Float dx, Float dy, Float dw, Float dh)
@@ -646,7 +642,9 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     _vk.vkEndCommandBuffer(commandBuffer);
 
     submitAndWait(commandBuffer);
-    updateSurface();
+    if (_context.presentMode == Gepard::PresentImmediate) {
+        updateSurface();
+    }
 
     // Clean up
     _vk.vkFreeDescriptorSets(_device, descriptorPool, 1u, &descriptorSet);
@@ -874,6 +872,11 @@ void GepardVulkan::fill()
 void GepardVulkan::stroke()
 {
     GD_NOT_IMPLEMENTED();
+}
+
+void GepardVulkan::finish()
+{
+    updateSurface();
 }
 
 void GepardVulkan::createDefaultInstance()

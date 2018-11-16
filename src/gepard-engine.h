@@ -33,7 +33,6 @@
 #include "gepard-image.h"
 #include "gepard-state.h"
 
-
 // Include engine backend.
 #if defined(GD_USE_GLES2)
 #include "gepard-gles2.h"
@@ -112,6 +111,9 @@ public:
     void setMiterLimit(const std::string&);
 
     GepardContext& context() { return _context; }
+
+    // Experimental
+    void finish();
 
 private:
     GepardState& state();

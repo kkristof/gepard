@@ -415,4 +415,14 @@ void GepardEngine::setMiterLimit(const std::string& limit)
     state().miterLimit = strToFloat(limit);
 }
 
+void GepardEngine::finish()
+{
+    GD_ASSERT(_engineBackend);
+#ifdef GD_USE_VULKAN
+    return _engineBackend->finish();
+#else // !GD_USE_VULKAN
+    GD_NOT_IMPLEMENTED();
+#endif // GD_USE_VULKAN
+}
+
 } // namespace gepard

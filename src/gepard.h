@@ -449,6 +449,28 @@ public:
      */
     void setStrokeColor(const int red, const int green, const int blue, const float alpha = 1.0f);
 
+    /*!
+     * \brief Experimental finish command
+     * Blocks the execution until all pending draw commands are executed.
+     */
+    void finish();
+
+    /*!
+     * \brief Experimental PresentMode enum
+     * \value PresentImmediate blocks the execution and updates the surface
+     *  at every command
+     * \value PresentOnDemand update the surface on finish calls
+     */
+    enum PresentMode {
+        PresentImmediate = 0,
+        PresentOnDemand = 1,
+    };
+
+    /*!
+     * \brief Experimental set present mode
+     * \param mode PresentMode value
+     */
+    void setPresentMode(PresentMode mode);
     /// \} A. NonCanvasAPI Functions
 
 private:
