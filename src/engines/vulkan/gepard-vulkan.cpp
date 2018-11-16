@@ -72,6 +72,7 @@ GepardVulkan::GepardVulkan(GepardContext& context)
     , _imageFormat(VK_FORMAT_R8G8B8A8_UNORM)
     , _wsiSurface(0)
     , _wsiSwapChain(0)
+    , _currentCommandBuffer(0u)
 {
     GD_LOG(INFO) << "Initialize GepardVulkan";
     _vk.loadGlobalFunctions();
@@ -263,14 +264,7 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     // Drawing
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
 
-    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
-       VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
-       nullptr,                                     // const void*                              pNext;
-       VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
-       nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
-    };
-
-    _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    beginCommandBuffer(commandBuffer);
 
     const VkClearValue clearValue = { 0.0, 0.0, 0.0, 0.0 };
 
@@ -297,8 +291,6 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
 
     _vk.vkCmdEndRenderPass(commandBuffer);
 
-    _vk.vkEndCommandBuffer(commandBuffer);
-
     const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
         nullptr,                        // const void*                    pNext;
@@ -314,10 +306,11 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     VkQueue queue;
     _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
 
-    submitAndWait(commandBuffer);
-    _drawResContainer->clear();
     if (_context.presentMode == Gepard::PresentImmediate) {
+        endCommandBuffer(commandBuffer);
+        submitAndWait(commandBuffer);
         updateSurface();
+        _drawResContainer->clear();
     }
 }
 
@@ -876,7 +869,11 @@ void GepardVulkan::stroke()
 
 void GepardVulkan::finish()
 {
+    VkCommandBuffer cmdBuffer = _currentCommandBuffer;
+    endCommandBuffer(cmdBuffer);
+    submitAndWait(cmdBuffer);
     updateSurface();
+    _drawResContainer->clear();
 }
 
 void GepardVulkan::createDefaultInstance()
@@ -2028,6 +2025,28 @@ void GepardVulkan::compileShaderModules()
     createShaderModule(_shaderModules["fillRectFragment"], fillRectFrag, sizeof(fillRectFrag));
     createShaderModule(_shaderModules["imageVertex"], imageVert,  sizeof(imageVert));
     createShaderModule(_shaderModules["imageFragment"], imageFrag, sizeof(imageFrag));
+}
+
+void GepardVulkan::beginCommandBuffer(VkCommandBuffer commandBuffer)
+{
+    if (_currentCommandBuffer == 0u) {
+        const VkCommandBufferBeginInfo commandBufferBeginInfo = {
+           VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
+           nullptr,                                     // const void*                              pNext;
+           VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
+           nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
+        };
+        _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+        _currentCommandBuffer = commandBuffer;
+    }
+}
+
+void GepardVulkan::endCommandBuffer(VkCommandBuffer commandBuffer)
+{
+    if (commandBuffer) {
+        _vk.vkEndCommandBuffer(commandBuffer);
+        _currentCommandBuffer = 0u;
+    }
 }
 
 } // namespace vulkan

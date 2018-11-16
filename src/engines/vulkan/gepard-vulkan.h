@@ -86,6 +86,7 @@ private:
 #endif
     GepardVulkanContainer* _drawResContainer;
     VkFence _primaryCommandBufferFence;
+    VkCommandBuffer _currentCommandBuffer;
 
     void createDefaultInstance();
     void chooseDefaultPhysicalDevice();
@@ -124,6 +125,8 @@ private:
     void updateSurface();
     std::vector<float> getTransformationMatrix();
     void compileShaderModules();
+    void beginCommandBuffer(VkCommandBuffer commandBuffer);
+    void endCommandBuffer(VkCommandBuffer commandBuffer);
 };
 
 // TODO: create a header for these constants
