@@ -87,16 +87,42 @@ void GepardVkBufferElement::destroyElement(GepardVulkanInterface &vk, VkDevice &
     vk.vkDestroyBuffer(device, _buffer, allocator);
 }
 
-GepardVKPipelineElement::GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout)
+GepardVKPipelineElement::GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout, VkDescriptorSetLayout descriptorSetLayout)
     : _pipeline(pipeline)
     , _layout(layout)
+    , _descriptorSetLayout(descriptorSetLayout)
 {
 }
 
 void GepardVKPipelineElement::destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator)
 {
+    if (_descriptorSetLayout) {
+        vk.vkDestroyDescriptorSetLayout(device, _descriptorSetLayout, allocator);
+    }
     vk.vkDestroyPipeline(device, _pipeline, allocator);
     vk.vkDestroyPipelineLayout(device, _layout, allocator);
+}
+
+GepardVkSamplerElement::GepardVkSamplerElement(VkSampler sampler)
+    : _sampler(sampler)
+{
+}
+
+void GepardVkSamplerElement::destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator)
+{
+    vk.vkDestroySampler(device, _sampler, allocator);
+}
+
+GepardVkDescriptorSet::GepardVkDescriptorSet(VkDescriptorSet descriptorSet, VkDescriptorPool descriptorPool)
+    : _descriptorSet(descriptorSet)
+    , _descriptorPool(descriptorPool)
+{
+}
+
+void GepardVkDescriptorSet::destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator)
+{
+    vk.vkFreeDescriptorSets(device, _descriptorPool, 1u, &_descriptorSet);
+    vk.vkDestroyDescriptorPool(device, _descriptorPool, allocator);
 }
 
 } // namespace vulkan

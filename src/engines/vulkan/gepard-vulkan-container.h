@@ -68,12 +68,34 @@ private:
 class GepardVKPipelineElement : virtual public VkBaseElement
 {
 public:
-    GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout);
+    GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout, VkDescriptorSetLayout descriptorSetLayout = 0u);
 
     virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator) override;
 private:
     VkPipeline _pipeline;
     VkPipelineLayout _layout;
+    VkDescriptorSetLayout _descriptorSetLayout;
+};
+
+class GepardVkSamplerElement : virtual public VkBaseElement
+{
+public:
+    GepardVkSamplerElement(VkSampler sampler);
+
+    virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator) override;
+private:
+    VkSampler _sampler;
+};
+
+class GepardVkDescriptorSet : virtual public VkBaseElement
+{
+public:
+    GepardVkDescriptorSet(VkDescriptorSet descriptorSet, VkDescriptorPool descriptorPool);
+
+    virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator) override;
+private:
+    VkDescriptorSet _descriptorSet;
+    VkDescriptorPool _descriptorPool;
 };
 
 class GepardVulkanContainer

@@ -132,6 +132,9 @@ GepardVulkan::~GepardVulkan()
     if (_wsiSwapChain) {
         _vk.vkDestroySwapchainKHR(_device, _wsiSwapChain, _allocator);
     }
+    _vk.vkDestroyPipelineLayout(_device, _fillRectLayout, _allocator);
+    _vk.vkDestroyPipeline(_device, _fillRectPipeline, _allocator);
+
     if (_device) {
         _vk.vkDestroyDevice(_device, _allocator);
     }
@@ -387,6 +390,7 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
         VK_FALSE,                                   // VkBool32                unnormalizedCoordinates;
     };
     _vk.vkCreateSampler(_device, &samplerInfo, _allocator, &sampler);
+    container.addElement(new GepardVkSamplerElement(sampler));
 
     const VkDescriptorPoolSize descriptorPoolSize = {
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  // VkDescriptorType    type;
@@ -453,6 +457,7 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     };
 
     _vk.vkUpdateDescriptorSets(_device, 1u, &writeDescriptorSet, 0u, nullptr);
+    container.addElement(new GepardVkDescriptorSet(descriptorSet, descriptorPool));
 
     const VkPushConstantRange pushConstantRange = {
         VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
@@ -470,7 +475,7 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
           &pushConstantRange                              // const VkPushConstantRange*     pPushConstantRanges
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
-    container.addElement(new GepardVKPipelineElement(pipeline, layout));
+    container.addElement(new GepardVKPipelineElement(pipeline, layout, descriptorSetLayout));
 
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
@@ -576,13 +581,6 @@ void GepardVulkan::drawImage(Image& imagedata, Float sx, Float sy, Float sw, Flo
     if (_context.presentMode == Gepard::PresentImmediate) {
         updateSurface();
     }
-
-    // Clean up
-    _vk.vkFreeDescriptorSets(_device, descriptorPool, 1u, &descriptorSet);
-    _vk.vkDestroySampler(_device, sampler, _allocator);
-
-    _vk.vkDestroyDescriptorSetLayout(_device, descriptorSetLayout, _allocator);
-    _vk.vkDestroyDescriptorPool(_device, descriptorPool, _allocator);
 }
 
 void GepardVulkan::putImage(Image& imagedata, Float dx, Float dy, Float dirtyX, Float dirtyY, Float dirtyWidth, Float dirtyHeight)
