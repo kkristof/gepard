@@ -1,5 +1,5 @@
-/* Copyright (C) 2015-2018, Gepard Graphics
- * Copyright (C) 2016, 2018 Kristof Kosztyo <kkristof@inf.u-szeged.hu>
+/* Copyright (C) 2018, Gepard Graphics
+ * Copyright (C) 2018, Szilard Ledan <szledan@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,37 +23,31 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GEPARD_IMAGE_H
-#define GEPARD_IMAGE_H
+#ifndef GEPARD_ENGINE_BACKEND_H
+#define GEPARD_ENGINE_BACKEND_H
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "gepard-color.h"
+#include "gepard-float.h"
+#include "gepard-image.h"
+#include "gepard-state.h"
 
 namespace gepard {
 
-class Image {
+class Image;
+class Surface;
+
+class GepardEngineBackend {
 public:
-    Image();
-    Image(uint32_t width, uint32_t height);
-    Image(uint32_t width, uint32_t height, const std::vector<uint32_t> &data);
-    virtual ~Image();
+    virtual ~GepardEngineBackend() {}
 
-    const uint32_t width() const;
-    const uint32_t height() const;
-    const std::vector<uint32_t> &data() const;
-
-private:
-    uint32_t _width;
-    uint32_t _height;
-    std::vector<uint32_t> _data;
+    virtual void fillRect(const Float x, const Float y, const Float w, const Float h) = 0;
+    virtual void fillPath(PathData*, const GepardState&) = 0;
+    virtual void strokePath() = 0;
+    virtual void drawImage(const Image& imagedata, const Float sx, const Float sy, const Float sw, const Float sh, const Float dx, const Float dy, const Float dw, const Float dh) = 0;
+    virtual void putImage(const Image& imagedata, const Float dx, const Float dy, const Float dirtyX, const Float dirtyY, const Float dirtyWidth, const Float dirtyHeight) = 0;
+    virtual Image getImage(const Float sx, const Float sy, const Float sw, const Float sh) = 0;
 };
-
-namespace utils {
-    bool savePng(const Image &image, const std::string &fileName);
-    Image loadPng(const std::string &fileName);
-}
 
 } // namespace gepard
 
-#endif // GEPARD_IMAGE_H
+#endif // GEPARD_ENGINE_BACKEND_H

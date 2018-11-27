@@ -48,16 +48,6 @@ void generateCheckerBoard(gepard::Gepard& gepard)
     }
 }
 
-void fillImage(gepard::Image& image)
-{
-    for (uint32_t i = 0; i < image.width(); i++) {
-        for (uint32_t j = 0; j < image.height(); j++) {
-            uint32_t color = 0x7f7f7f7f;
-            image.data()[i * image.width() + j] = color;
-        }
-    }
-}
-
 int main()
 {
     gepard::XSurface surface(SURFACE_SIZE, SURFACE_SIZE);
@@ -72,7 +62,6 @@ int main()
     gepard.setPresentMode(gepard::Gepard::PresentImmediate);
     gepard.restore();
     gepard::Image image = gepard.createImageData(200.0, 200.0);
-    fillImage(image);
 
     gepard::Image image2 = gepard.createImageData(image);
 
