@@ -57,7 +57,7 @@ public:
     virtual void strokePath() override;
 
     // Experimental
-    void finish();
+    virtual void finish() override;
 
 private:
     GepardContext& _context;

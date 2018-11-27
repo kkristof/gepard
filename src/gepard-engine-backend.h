@@ -46,6 +46,12 @@ public:
     virtual void drawImage(const Image& imagedata, const Float sx, const Float sy, const Float sw, const Float sh, const Float dx, const Float dy, const Float dw, const Float dh) = 0;
     virtual void putImage(const Image& imagedata, const Float dx, const Float dy, const Float dirtyX, const Float dirtyY, const Float dirtyWidth, const Float dirtyHeight) = 0;
     virtual Image getImage(const Float sx, const Float sy, const Float sw, const Float sh) = 0;
+
+    // experimental
+    virtual void finish()
+    {
+        GD_NOT_IMPLEMENTED();
+    }
 };
 
 } // namespace gepard
