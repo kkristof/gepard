@@ -71,6 +71,9 @@ public:
     GepardVKPipelineElement(VkPipeline pipeline, VkPipelineLayout layout, VkDescriptorSetLayout descriptorSetLayout = 0u);
 
     virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks *allocator) override;
+    VkPipeline pipeline();
+    VkPipelineLayout layout();
+    VkDescriptorSetLayout descriptorSetLayout();
 private:
     VkPipeline _pipeline;
     VkPipelineLayout _layout;

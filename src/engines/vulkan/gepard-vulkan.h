@@ -90,8 +90,9 @@ private:
     VkCommandBuffer _currentCommandBuffer;
 
     // Experimental
-    VkPipelineLayout _fillRectLayout;
-    VkPipeline _fillRectPipeline;
+    std::map<std::string, GepardVKPipelineElement*> _pipelines;
+
+    bool _commandBufferPending = false;
 
     void createDefaultInstance();
     void chooseDefaultPhysicalDevice();
@@ -134,6 +135,7 @@ private:
     void beginCommandBuffer(VkCommandBuffer commandBuffer);
     void endCommandBuffer(VkCommandBuffer commandBuffer);
     void createFillRectPipeline();
+    void createImagePipeline();
 };
 
 // TODO: create a header for these constants

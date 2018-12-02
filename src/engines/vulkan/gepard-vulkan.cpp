@@ -97,6 +97,7 @@ GepardVulkan::GepardVulkan(GepardContext& context)
     compileShaderModules();
     _drawResContainer = new GepardVulkanContainer(_vk, _device, _allocator);
     createFillRectPipeline();
+    createImagePipeline();
 }
 
 GepardVulkan::~GepardVulkan()
@@ -132,8 +133,10 @@ GepardVulkan::~GepardVulkan()
     if (_wsiSwapChain) {
         _vk.vkDestroySwapchainKHR(_device, _wsiSwapChain, _allocator);
     }
-    _vk.vkDestroyPipelineLayout(_device, _fillRectLayout, _allocator);
-    _vk.vkDestroyPipeline(_device, _fillRectPipeline, _allocator);
+
+    for (auto& pipeline: _pipelines) {
+        pipeline.second->destroyElement(_vk, _device, _allocator);
+    }
 
     if (_device) {
         _vk.vkDestroyDevice(_device, _allocator);
@@ -202,8 +205,9 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
     _drawResContainer->addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
     uploadToDeviceMemory(indexBufferMemory, (void*)rectIndicies, indexMemoryRequirements.size);
 
-
-    //_drawResContainer->addElement(new GepardVKPipelineElement(pipeline, layout));
+    GepardVKPipelineElement* pipelineElement = _pipelines["fillRect"];
+    VkPipelineLayout layout = pipelineElement->layout();
+    VkPipeline pipeline = pipelineElement->pipeline();
 
     // Drawing
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
@@ -222,9 +226,9 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
         &clearValue,                                // const VkClearValue*    pClearValues;
     };
 
-    _vk.vkCmdPushConstants(commandBuffer, _fillRectLayout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
+    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _fillRectPipeline);
+    _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
     _vk.vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &vertexBufferOffset);
     _vk.vkCmdBindVertexBuffers(commandBuffer, 1, 1, &instanceBuffer, &instanceBufferOffset);
@@ -235,23 +239,8 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
 
     _vk.vkCmdEndRenderPass(commandBuffer);
 
-    const VkSubmitInfo submitInfo = {
-        VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
-        nullptr,                        // const void*                    pNext;
-        0u,                             // uint32_t                       waitSemaphoreCount;
-        nullptr,                        // const VkSemaphore*             pWaitSemaphores;
-        nullptr,                        // const VkPipelineStageFlags*    pWaitDstStageMask;
-        1u,                             // uint32_t                       commandBufferCount;
-        &commandBuffer,                 // const VkCommandBuffer*         pCommandBuffers;
-        0u,                             // uint32_t                       signalSemaphoreCount;
-        nullptr,                        // const VkSemaphore*             pSignalSemaphores;
-    };
-
     if (_context.presentMode == Gepard::PresentImmediate) {
-        endCommandBuffer(commandBuffer);
-        submitAndWait(commandBuffer);
-        updateSurface();
-        _drawResContainer->clear();
+        finish();
     }
 }
 
@@ -260,13 +249,12 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
     GD_LOG(DEBUG) << "drawImage " << sx << " " << sy << " " << sw << " " << sh << " " << dx << " " << dy << " " << dw << " " << dh;
     const uint32_t width = imagedata.width();
     const uint32_t height = imagedata.height();
-    GepardVulkanContainer container(_vk, _device, _allocator);
     VkBuffer buffer;
     VkDeviceMemory bufferAlloc;
     VkMemoryRequirements bufferMemoryRequirements;
     const VkDeviceSize bufferSize = width * height * sizeof(uint32_t); // r8g8b8a8 format
     createBuffer(buffer, bufferAlloc, bufferMemoryRequirements, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-    container.addElement(new GepardVkBufferElement(buffer, bufferAlloc));
+    _drawResContainer->addElement(new GepardVkBufferElement(buffer, bufferAlloc));
     uploadToDeviceMemory(bufferAlloc, imagedata.data().data(), bufferSize);
 
     VkImage image;
@@ -282,7 +270,7 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
 
     createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     createImageView(imageView, image);
-    container.addElement(new GepardVkImageElement(image, imageView, imageMemory));
+    _drawResContainer->addElement(new GepardVkImageElement(image, imageView, imageMemory));
 
     // Vertex data setup
     const float texLeft = static_cast<float>(sx / imagedata.width());
@@ -315,7 +303,7 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
     VkDeviceSize vertexBufferOffset = 0;
 
     createBuffer(vertexBuffer, vertexBufferMemory, vertexMemoryRequirements, (VkDeviceSize)sizeof(vertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    container.addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
+    _drawResContainer->addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
     uploadToDeviceMemory(vertexBufferMemory, (void*)vertexData, vertexMemoryRequirements.size, vertexBufferOffset);
 
     VkBuffer indexBuffer;
@@ -323,48 +311,14 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
     VkMemoryRequirements indexMemoryRequirements;
 
     createBuffer(indexBuffer, indexBufferMemory, indexMemoryRequirements, (VkDeviceSize)sizeof(rectIndicies), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    container.addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
+    _drawResContainer->addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
     uploadToDeviceMemory(indexBufferMemory, rectIndicies, indexMemoryRequirements.size);
 
-    // Pipeline creation
-    VkShaderModule vertex = _shaderModules["imageVertex"];
-    VkShaderModule fragment = _shaderModules["imageFragment"];
-
-    const VkVertexInputBindingDescription bindingDescription = {
-        0u,                             // uint32_t             binding;
-        2 * (2 * sizeof(float)),        // uint32_t             stride;
-        VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
-    };
-
-    const VkVertexInputAttributeDescription vertexAttributeDescriptions[] = {
-        {
-            0u,                             // uint32_t location
-            0u,                             // uint32_t binding
-            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
-            0u,                             // uint32_t offset
-        },
-        {
-            1u,                             // uint32_t location
-            0u,                             // uint32_t binding
-            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
-            sizeof(float) * 2,              // uint32_t offset
-        },
-    };
-
-    const VkPipelineVertexInputStateCreateInfo vertexInputState = {
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,  // VkStructureType                             sType;
-        nullptr,                                                    // const void*                                 pNext;
-        0,                                                          // VkPipelineVertexInputStateCreateFlags       flags;
-        1u,                                                         // uint32_t                                    vertexBindingDescriptionCount;
-        &bindingDescription,                                        // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
-        2u,                                                         // uint32_t                                    vertexAttributeDescriptionCount;
-        vertexAttributeDescriptions,                                // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
-    };
-
-    VkPipelineLayout layout;
-    VkPipeline pipeline;
+    GepardVKPipelineElement* pipelineElement = _pipelines["drawImage"];
+    VkPipelineLayout layout = pipelineElement->layout();
+    VkPipeline pipeline = pipelineElement->pipeline();
+    VkDescriptorSetLayout descriptorSetLayout = pipelineElement->descriptorSetLayout();
     VkDescriptorPool descriptorPool;
-    VkDescriptorSetLayout descriptorSetLayout;
     VkDescriptorSet descriptorSet;
     VkSampler sampler;
 
@@ -389,7 +343,7 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
         VK_FALSE,                                   // VkBool32                unnormalizedCoordinates;
     };
     _vk.vkCreateSampler(_device, &samplerInfo, _allocator, &sampler);
-    container.addElement(new GepardVkSamplerElement(sampler));
+    _drawResContainer->addElement(new GepardVkSamplerElement(sampler));
 
     const VkDescriptorPoolSize descriptorPoolSize = {
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  // VkDescriptorType    type;
@@ -405,26 +359,7 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
         &descriptorPoolSize,                                // const VkDescriptorPoolSize*    pPoolSizes;
     };
 
-    // TODO: this might be moved to gepard instance level instead of function level
     _vk.vkCreateDescriptorPool(_device, &descriptorPoolCreateInfo, _allocator, &descriptorPool);
-
-    const VkDescriptorSetLayoutBinding descriptoSetrLayoutBinding = {
-        0u,                                         // uint32_t              binding;
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  // VkDescriptorType      descriptorType;
-        1u,                                         // uint32_t              descriptorCount;
-        VK_SHADER_STAGE_FRAGMENT_BIT,               // VkShaderStageFlags    stageFlags;
-        nullptr,                                    // const VkSampler*      pImmutableSamplers;
-    };
-
-    const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,    // VkStructureType                        sType;
-        nullptr,                                                // const void*                            pNext;
-        0,                                                      // VkDescriptorSetLayoutCreateFlags       flags;
-        1u,                                                     // uint32_t                               bindingCount;
-        &descriptoSetrLayoutBinding,                            // const VkDescriptorSetLayoutBinding*    pBindings;
-    };
-
-    _vk.vkCreateDescriptorSetLayout(_device, &descriptorSetLayoutCreateInfo, _allocator, &descriptorSetLayout);
 
     const VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, // VkStructureType                 sType;
@@ -456,33 +391,7 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
     };
 
     _vk.vkUpdateDescriptorSets(_device, 1u, &writeDescriptorSet, 0u, nullptr);
-    container.addElement(new GepardVkDescriptorSet(descriptorSet, descriptorPool));
-
-    const VkPushConstantRange pushConstantRange = {
-        VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
-        0u,                         // uint32_t              offset;
-        pushConstantsSize,          // uint32_t              size;
-    };
-
-    const VkPipelineLayoutCreateInfo layoutCreateInfo = {
-          VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,  // VkStructureType                sType
-          nullptr,                                        // const void*                    pNext
-          0,                                              // VkPipelineLayoutCreateFlags    flags
-          1u,                                             // uint32_t                       setLayoutCount
-          &descriptorSetLayout,                           // const VkDescriptorSetLayout*   pSetLayouts
-          1u,                                             // uint32_t                       pushConstantRangeCount
-          &pushConstantRange                              // const VkPushConstantRange*     pPushConstantRanges
-    };
-    createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
-    container.addElement(new GepardVKPipelineElement(pipeline, layout, descriptorSetLayout));
-
-    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
-    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
-       VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
-       nullptr,                                     // const void*                              pNext;
-       VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
-       nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
-    };
+    _drawResContainer->addElement(new GepardVkDescriptorSet(descriptorSet, descriptorPool));
 
     VkImageSubresourceLayers subResourceLayers = {
         VK_IMAGE_ASPECT_COLOR_BIT,  //VkImageAspectFlags    aspectMask;
@@ -542,7 +451,8 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
-    _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    beginCommandBuffer(commandBuffer);
 
     const VkClearValue clearValue = { 0.0, 0.0, 0.0, 0.0 };
 
@@ -574,11 +484,8 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
 
     _vk.vkCmdEndRenderPass(commandBuffer);
 
-    _vk.vkEndCommandBuffer(commandBuffer);
-
-    submitAndWait(commandBuffer);
     if (_context.presentMode == Gepard::PresentImmediate) {
-        updateSurface();
+        finish();
     }
 }
 
@@ -788,6 +695,7 @@ Image GepardVulkan::getImage(const Float sx, const Float sy, const Float sw, con
     uint32_t w = sw;
     uint32_t h = sh;
     imageData.resize(w * h);
+    finish();
     readImage(imageData.data(), x, y, w, h);
     return Image(w, h, imageData);
 }
@@ -804,11 +712,13 @@ void GepardVulkan::strokePath()
 
 void GepardVulkan::finish()
 {
-    VkCommandBuffer cmdBuffer = _currentCommandBuffer;
-    endCommandBuffer(cmdBuffer);
-    submitAndWait(cmdBuffer);
-    updateSurface();
-    _drawResContainer->clear();
+    if (_commandBufferPending) {
+        VkCommandBuffer cmdBuffer = _currentCommandBuffer;
+        endCommandBuffer(cmdBuffer);
+        submitAndWait(cmdBuffer);
+        updateSurface();
+        _drawResContainer->clear();
+    }
 }
 
 void GepardVulkan::createDefaultInstance()
@@ -1975,6 +1885,7 @@ void GepardVulkan::compileShaderModules()
 
 void GepardVulkan::beginCommandBuffer(VkCommandBuffer commandBuffer)
 {
+    _commandBufferPending = true;
     if (_currentCommandBuffer == 0u) {
         const VkCommandBufferBeginInfo commandBufferBeginInfo = {
            VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
@@ -1989,6 +1900,7 @@ void GepardVulkan::beginCommandBuffer(VkCommandBuffer commandBuffer)
 
 void GepardVulkan::endCommandBuffer(VkCommandBuffer commandBuffer)
 {
+    _commandBufferPending = false;
     if (commandBuffer) {
         _vk.vkEndCommandBuffer(commandBuffer);
         _currentCommandBuffer = 0u;
@@ -1997,9 +1909,10 @@ void GepardVulkan::endCommandBuffer(VkCommandBuffer commandBuffer)
 
 void GepardVulkan::createFillRectPipeline()
 {
-    // Pipeline creation
     VkShaderModule vertex = _shaderModules["fillRectVertex"];
     VkShaderModule fragment = _shaderModules["fillRectFragment"];
+    VkPipelineLayout layout;
+    VkPipeline pipeline;
     uint32_t pushConstantsSize = 14 * sizeof(float);
 
     const VkVertexInputBindingDescription bindingDescription[] = {
@@ -2055,7 +1968,85 @@ void GepardVulkan::createFillRectPipeline()
           1u,                                               // uint32_t                       pushConstantRangeCount
           &pushConstantRange                                // const VkPushConstantRange*     pPushConstantRanges
     };
-    createSimplePipeline(_fillRectPipeline, _fillRectLayout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
+    createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
+    _pipelines["fillRect"] = new GepardVKPipelineElement(pipeline, layout);
+}
+
+void GepardVulkan::createImagePipeline()
+{
+    VkShaderModule vertex = _shaderModules["imageVertex"];
+    VkShaderModule fragment = _shaderModules["imageFragment"];
+    VkPipelineLayout layout;
+    VkPipeline pipeline;
+    VkDescriptorSetLayout descriptorSetLayout;
+    uint32_t pushConstantsSize = 14 * sizeof(float);
+
+    const VkVertexInputBindingDescription bindingDescription = {
+        0u,                             // uint32_t             binding;
+        2 * (2 * sizeof(float)),        // uint32_t             stride;
+        VK_VERTEX_INPUT_RATE_VERTEX,    // VkVertexInputRate    inputRate;
+    };
+
+    const VkVertexInputAttributeDescription vertexAttributeDescriptions[] = {
+        {
+            0u,                             // uint32_t location
+            0u,                             // uint32_t binding
+            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
+            0u,                             // uint32_t offset
+        },
+        {
+            1u,                             // uint32_t location
+            0u,                             // uint32_t binding
+            VK_FORMAT_R32G32_SFLOAT,        // VkFormat format
+            sizeof(float) * 2,              // uint32_t offset
+        },
+    };
+
+    const VkPipelineVertexInputStateCreateInfo vertexInputState = {
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,  // VkStructureType                             sType;
+        nullptr,                                                    // const void*                                 pNext;
+        0,                                                          // VkPipelineVertexInputStateCreateFlags       flags;
+        1u,                                                         // uint32_t                                    vertexBindingDescriptionCount;
+        &bindingDescription,                                        // const VkVertexInputBindingDescription*      pVertexBindingDescriptions;
+        2u,                                                         // uint32_t                                    vertexAttributeDescriptionCount;
+        vertexAttributeDescriptions,                                // const VkVertexInputAttributeDescription*    pVertexAttributeDescriptions;
+    };
+
+    const VkDescriptorSetLayoutBinding descriptoSetrLayoutBinding = {
+        0u,                                         // uint32_t              binding;
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,  // VkDescriptorType      descriptorType;
+        1u,                                         // uint32_t              descriptorCount;
+        VK_SHADER_STAGE_FRAGMENT_BIT,               // VkShaderStageFlags    stageFlags;
+        nullptr,                                    // const VkSampler*      pImmutableSamplers;
+    };
+
+    const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,    // VkStructureType                        sType;
+        nullptr,                                                // const void*                            pNext;
+        0,                                                      // VkDescriptorSetLayoutCreateFlags       flags;
+        1u,                                                     // uint32_t                               bindingCount;
+        &descriptoSetrLayoutBinding,                            // const VkDescriptorSetLayoutBinding*    pBindings;
+    };
+
+    _vk.vkCreateDescriptorSetLayout(_device, &descriptorSetLayoutCreateInfo, _allocator, &descriptorSetLayout);
+
+    const VkPushConstantRange pushConstantRange = {
+        VK_SHADER_STAGE_VERTEX_BIT, // VkShaderStageFlags    stageFlags;
+        0u,                         // uint32_t              offset;
+        pushConstantsSize,          // uint32_t              size;
+    };
+
+    const VkPipelineLayoutCreateInfo layoutCreateInfo = {
+          VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,  // VkStructureType                sType
+          nullptr,                                        // const void*                    pNext
+          0,                                              // VkPipelineLayoutCreateFlags    flags
+          1u,                                             // uint32_t                       setLayoutCount
+          &descriptorSetLayout,                           // const VkDescriptorSetLayout*   pSetLayouts
+          1u,                                             // uint32_t                       pushConstantRangeCount
+          &pushConstantRange                              // const VkPushConstantRange*     pPushConstantRanges
+    };
+    createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
+    _pipelines["drawImage"] = new GepardVKPipelineElement(pipeline, layout, descriptorSetLayout);
 }
 
 } // namespace vulkan

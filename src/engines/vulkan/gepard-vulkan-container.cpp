@@ -103,6 +103,21 @@ void GepardVKPipelineElement::destroyElement(GepardVulkanInterface &vk, VkDevice
     vk.vkDestroyPipelineLayout(device, _layout, allocator);
 }
 
+VkPipeline GepardVKPipelineElement::pipeline()
+{
+    return _pipeline;
+}
+
+VkPipelineLayout GepardVKPipelineElement::layout()
+{
+    return _layout;
+}
+
+VkDescriptorSetLayout GepardVKPipelineElement::descriptorSetLayout()
+{
+    return _descriptorSetLayout;
+}
+
 GepardVkSamplerElement::GepardVkSamplerElement(VkSampler sampler)
     : _sampler(sampler)
 {
