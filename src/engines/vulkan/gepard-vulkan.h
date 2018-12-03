@@ -91,7 +91,6 @@ private:
 
     // Experimental
     std::map<std::string, GepardVKPipelineElement*> _pipelines;
-
     bool _commandBufferPending = false;
 
     void createDefaultInstance();
@@ -116,6 +115,8 @@ private:
     void createShaderModule(VkShaderModule& shader, const uint32_t* code, const size_t codeSize);
 
     void uploadToDeviceMemory(VkDeviceMemory buffer, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+    void copyBufferToImage(VkBuffer& buffer, VkImage& image, VkExtent3D extent);
+
     void createSimplePipeline(VkPipeline& pipeline,
                               VkPipelineLayout& layout,
                               const VkShaderModule vertex,
