@@ -1996,6 +1996,10 @@ void GepardVulkan::createImagePipeline()
 void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageView &imageView, VkDeviceMemory &imageMemory)
 {
     GD_LOG(DEBUG) << "uploadImage";
+    // TODO: better key is needed
+    // if the previous image can be stored in the vector
+    // the address of the vector's data won't change
+    // also consider updateRegions() for the engine
     size_t key = (size_t) imagedata.data().data();
     auto iterator = _nativeImages.find(key);
     if (iterator != _nativeImages.end()) {
