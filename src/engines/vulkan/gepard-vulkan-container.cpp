@@ -42,6 +42,21 @@ void GepardVkImageElement::destroyElement(GepardVulkanInterface &vk, VkDevice &d
     vk.vkDestroyImage(device, _image, allocator);
 }
 
+VkImage GepardVkImageElement::getImage()
+{
+    return _image;
+}
+
+VkImageView GepardVkImageElement::getImageView()
+{
+    return _imageView;
+}
+
+VkDeviceMemory GepardVkImageElement::getMemory()
+{
+    return _imageMemory;
+}
+
 VkBaseElement::VkBaseElement()
 {
 }

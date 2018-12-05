@@ -91,6 +91,7 @@ private:
 
     // Experimental
     std::map<std::string, GepardVKPipelineElement*> _pipelines;
+    std::map<size_t, GepardVkImageElement*> _nativeImages;
     bool _commandBufferPending = false;
 
     void createDefaultInstance();

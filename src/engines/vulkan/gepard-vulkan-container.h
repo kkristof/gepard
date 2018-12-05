@@ -48,6 +48,9 @@ public:
     GepardVkImageElement(VkImage image, VkImageView imageView, VkDeviceMemory memory);
 
     virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks* allocator) override;
+    VkImage getImage();
+    VkImageView getImageView();
+    VkDeviceMemory getMemory();
 private:
     VkImage _image;
     VkImageView _imageView;

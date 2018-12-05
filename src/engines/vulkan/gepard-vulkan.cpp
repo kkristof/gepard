@@ -138,6 +138,10 @@ GepardVulkan::~GepardVulkan()
         pipeline.second->destroyElement(_vk, _device, _allocator);
     }
 
+    for (auto& image: _nativeImages) {
+        image.second->destroyElement(_vk, _device, _allocator);
+    }
+
     if (_device) {
         _vk.vkDestroyDevice(_device, _allocator);
     }
@@ -251,7 +255,6 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
     VkImageView imageView;
     VkDeviceMemory imageMemory;
     uploadImage(imagedata, image, imageView, imageMemory);
-    _drawResContainer->addElement(new GepardVkImageElement(image, imageView, imageMemory));
 
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
     beginCommandBuffer(commandBuffer);
@@ -450,10 +453,10 @@ void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float 
     };
 
     VkImageSubresourceLayers subResourceLayers = {
-        VK_IMAGE_ASPECT_COLOR_BIT,  //VkImageAspectFlags    aspectMask;
-        0u,                         //uint32_t              mipLevel;
-        0u,                         //uint32_t              baseArrayLayer;
-        1u,                         //uint32_t              layerCount;
+        VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
+        0u,                         // uint32_t              mipLevel;
+        0u,                         // uint32_t              baseArrayLayer;
+        1u,                         // uint32_t              layerCount;
     };
 
     VkBufferImageCopy bufferToImage = {
@@ -1598,10 +1601,10 @@ void GepardVulkan::uploadToDeviceMemory(VkDeviceMemory buffer, const void *data,
 void GepardVulkan::copyBufferToImage(VkBuffer &buffer, VkImage &image, VkExtent3D extent)
 {
     VkImageSubresourceLayers subResourceLayers = {
-        VK_IMAGE_ASPECT_COLOR_BIT,  //VkImageAspectFlags    aspectMask;
-        0u,                         //uint32_t              mipLevel;
-        0u,                         //uint32_t              baseArrayLayer;
-        1u,                         //uint32_t              layerCount;
+        VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
+        0u,                         // uint32_t              mipLevel;
+        0u,                         // uint32_t              baseArrayLayer;
+        1u,                         // uint32_t              layerCount;
     };
 
     VkBufferImageCopy bufferToImage = {
@@ -2036,6 +2039,16 @@ void GepardVulkan::createImagePipeline()
 void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageView &imageView, VkDeviceMemory &imageMemory)
 {
     GD_LOG(DEBUG) << "uploadImage";
+    size_t key = (size_t) imagedata.data().data();
+    auto iterator = _nativeImages.find(key);
+    if (iterator != _nativeImages.end()) {
+        GepardVkImageElement* imageElement = iterator->second;
+        image = imageElement->getImage();
+        imageView = imageElement->getImageView();
+        imageMemory = imageElement->getMemory();
+        GD_LOG(DEBUG) << "Image found in the images";
+        return;
+    }
     const uint32_t width = imagedata.width();
     const uint32_t height = imagedata.height();
     VkBuffer buffer;
@@ -2062,6 +2075,7 @@ void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageVi
     beginCommandBuffer(commandBuffer);
     copyBufferToImage(buffer, image, imageSize);
     finish();
+    _nativeImages[key] = new GepardVkImageElement(image, imageView, imageMemory);
 }
 
 } // namespace vulkan
