@@ -425,6 +425,7 @@ void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float 
     const VkDeviceSize bufferSize = width * height * sizeof(uint32_t); // r8g8b8a8 format
 
     createBuffer(buffer, bufferAlloc, bufferMemoryRequirements, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    _drawResContainer->addElement(new GepardVkBufferElement(buffer, bufferAlloc));
 
     void* bufferPtr;
     _vk.vkMapMemory(_device, bufferAlloc, 0, bufferMemoryRequirements.size, 0, &bufferPtr);
@@ -443,14 +444,9 @@ void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float 
     };
 
     createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-
+    _drawResContainer->addElement(new GepardVkImageElement(image, 0u, imageMemory));
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
-    const VkCommandBufferBeginInfo commandBufferBeginInfo = {
-       VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType                          sType;
-       nullptr,                                     // const void*                              pNext;
-       VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags                flags;
-       nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
-    };
+    beginCommandBuffer(commandBuffer);
 
     VkImageSubresourceLayers subResourceLayers = {
         VK_IMAGE_ASPECT_COLOR_BIT,  // VkImageAspectFlags    aspectMask;
@@ -561,53 +557,15 @@ void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float 
         extent,              // VkExtent3D                  extent;
     };
 
-    _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &bufferToImageCopyBarrier);
     _vk.vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferToImage);
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 2, imageBarriers);
     _vk.vkCmdCopyImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _surfaceImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &postImageBarrier);
-    _vk.vkEndCommandBuffer(commandBuffer);
 
-    const VkSubmitInfo submitInfo = {
-        VK_STRUCTURE_TYPE_SUBMIT_INFO,  // VkStructureType                sType;
-        nullptr,                        // const void*                    pNext;
-        0u,                             // uint32_t                       waitSemaphoreCount;
-        nullptr,                        // const VkSemaphore*             pWaitSemaphores;
-        nullptr,                        // const VkPipelineStageFlags*    pWaitDstStageMask;
-        1u,                             // uint32_t                       commandBufferCount;
-        &commandBuffer,                 // const VkCommandBuffer*         pCommandBuffers;
-        0u,                             // uint32_t                       signalSemaphoreCount;
-        nullptr,                        // const VkSemaphore*             pSignalSemaphores;
-    };
-
-    VkQueue queue;
-    _vk.vkGetDeviceQueue(_device, _queueFamilyIndex, 0, &queue);
-
-    const VkFenceCreateInfo fenceInfo = {
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,    // VkStructureType       sType;
-        nullptr,                                // const void*           pNext;
-        0,                                      // VkFenceCreateFlags    flags;
-    };
-
-    VkFence fence;
-    _vk.vkCreateFence(_device, &fenceInfo, _allocator, &fence);
-    vkResult = _vk.vkQueueSubmit(queue, 1, &submitInfo, fence);
-    GD_ASSERT(vkResult == VK_SUCCESS && "Queue submit failed!");
-
-    vkResult = _vk.vkWaitForFences(_device, 1, &fence, VK_TRUE, timeout);
-    if (vkResult == VK_TIMEOUT) {
-        GD_LOG(WARNING) << "TIMEOUT!";
+    if (_context.presentMode == Gepard::PresentImmediate) {
+        finish();
     }
-
-    updateSurface();
-
-    // Clean up
-    _vk.vkFreeMemory(_device, imageMemory, _allocator);
-    _vk.vkFreeMemory(_device, bufferAlloc, _allocator);
-    _vk.vkDestroyFence(_device, fence, _allocator);
-    _vk.vkDestroyImage(_device, image, _allocator);
-    _vk.vkDestroyBuffer(_device, buffer, _allocator);
 }
 
 Image GepardVulkan::getImage(const Float sx, const Float sy, const Float sw, const Float sh)

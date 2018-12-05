@@ -54,12 +54,11 @@ int main()
     gepard::Gepard gepard(&surface);
     gepard.setPresentMode(gepard::Gepard::PresentOnDemand);
     gepard.save();
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 5; i++) {
         gepard.translate(2.0, 1.5);
         generateCheckerBoard(gepard);
         gepard.finish();
     }
-    gepard.setPresentMode(gepard::Gepard::PresentImmediate);
     gepard.restore();
     gepard::Image image = gepard.createImageData(200.0, 200.0);
 
@@ -78,7 +77,16 @@ int main()
 
     gepard::Image testImage = gepard.getImageData(380, 380, 50, 50);
     gepard.setFillColor(255, 0, 0, 1.0f);
-    gepard.drawImage(testImage, 200.0, 200.0, 100, 100);
+    for (int j=0; j<10; j++) {
+        for (int i=0; i< 1000; i++) {
+        gepard.save();
+        gepard.translate(50 + i / 10, 200+j*20);
+        gepard.rotate(i / 800.0);
+        gepard.drawImage(testImage, -50.0, -50.0, 100, 100);
+        gepard.restore();
+        }
+        gepard.finish();
+    }
 
     while (true) {
         std::this_thread::sleep_for(std::chrono::nanoseconds(1));   // Only for CPU sparing.
