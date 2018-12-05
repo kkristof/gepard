@@ -415,7 +415,6 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
 void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float dy, const Float dirtyX, const Float dirtyY, const Float dirtyWidth, const Float dirtyHeight)
 {
     GD_LOG(DEBUG) << "putImage " << dx << " " << dy << " " << dirtyX << " " << dirtyY << " " << dirtyWidth << " " << dirtyHeight;
-    VkResult vkResult;
     const uint32_t width = imagedata.width();
     const uint32_t height = imagedata.height();
 
@@ -2032,7 +2031,9 @@ void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageVi
 
     beginCommandBuffer(commandBuffer);
     copyBufferToImage(buffer, image, imageSize);
-    finish();
+    if (_context.presentMode == Gepard::PresentImmediate) {
+        finish();
+    }
     _nativeImages[key] = new GepardVkImageElement(image, imageView, imageMemory);
 }
 
