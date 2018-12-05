@@ -247,30 +247,14 @@ void GepardVulkan::fillRect(const Float x, const Float y, const Float w, const F
 void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float sy, const Float sw, const Float sh, const Float dx, const Float dy, const Float dw, const Float dh)
 {
     GD_LOG(DEBUG) << "drawImage " << sx << " " << sy << " " << sw << " " << sh << " " << dx << " " << dy << " " << dw << " " << dh;
-    const uint32_t width = imagedata.width();
-    const uint32_t height = imagedata.height();
-    VkBuffer buffer;
-    VkDeviceMemory bufferAlloc;
-    VkMemoryRequirements bufferMemoryRequirements;
-    const VkDeviceSize bufferSize = width * height * sizeof(uint32_t); // r8g8b8a8 format
-    createBuffer(buffer, bufferAlloc, bufferMemoryRequirements, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-    _drawResContainer->addElement(new GepardVkBufferElement(buffer, bufferAlloc));
-    uploadToDeviceMemory(bufferAlloc, imagedata.data().data(), bufferSize);
-
     VkImage image;
     VkImageView imageView;
     VkDeviceMemory imageMemory;
-    VkMemoryRequirements imageMemoryRequirements;
-
-    const VkExtent3D imageSize = {
-        width,  // uint32_t    width;
-        height, // uint32_t    height;
-        1u,     // uint32_t    depth;
-    };
-
-    createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-    createImageView(imageView, image);
+    uploadImage(imagedata, image, imageView, imageMemory);
     _drawResContainer->addElement(new GepardVkImageElement(image, imageView, imageMemory));
+
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+    beginCommandBuffer(commandBuffer);
 
     // Vertex data setup
     const float texLeft = static_cast<float>(sx / imagedata.width());
@@ -393,8 +377,6 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
     _vk.vkUpdateDescriptorSets(_device, 1u, &writeDescriptorSet, 0u, nullptr);
     _drawResContainer->addElement(new GepardVkDescriptorSet(descriptorSet, descriptorPool));
 
-    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
-    beginCommandBuffer(commandBuffer);
 
     const VkClearValue clearValue = { 0.0, 0.0, 0.0, 0.0 };
 
@@ -407,8 +389,6 @@ void GepardVulkan::drawImage(const Image& imagedata, const Float sx, const Float
         1u,                                         // uint32_t               clearValueCount;
         &clearValue,                                // const VkClearValue*    pClearValues;
     };
-
-    copyBufferToImage(buffer, image, imageSize);
 
     _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
     _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -2051,6 +2031,37 @@ void GepardVulkan::createImagePipeline()
     };
     createSimplePipeline(pipeline, layout, vertex, fragment, vertexInputState, blendMode::oneMinusSrcAlpha, layoutCreateInfo);
     _pipelines["drawImage"] = new GepardVKPipelineElement(pipeline, layout, descriptorSetLayout);
+}
+
+void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageView &imageView, VkDeviceMemory &imageMemory)
+{
+    GD_LOG(DEBUG) << "uploadImage";
+    const uint32_t width = imagedata.width();
+    const uint32_t height = imagedata.height();
+    VkBuffer buffer;
+    VkDeviceMemory bufferAlloc;
+    VkMemoryRequirements bufferMemoryRequirements;
+
+    const VkExtent3D imageSize = {
+        width,  // uint32_t    width;
+        height, // uint32_t    height;
+        1u,     // uint32_t    depth;
+    };
+
+    const VkDeviceSize bufferSize = width * height * sizeof(uint32_t); // r8g8b8a8 format
+    createBuffer(buffer, bufferAlloc, bufferMemoryRequirements, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    _drawResContainer->addElement(new GepardVkBufferElement(buffer, bufferAlloc));
+    uploadToDeviceMemory(bufferAlloc, imagedata.data().data(), bufferSize);
+
+    VkMemoryRequirements imageMemoryRequirements;
+    createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    createImageView(imageView, image);
+
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+
+    beginCommandBuffer(commandBuffer);
+    copyBufferToImage(buffer, image, imageSize);
+    finish();
 }
 
 } // namespace vulkan

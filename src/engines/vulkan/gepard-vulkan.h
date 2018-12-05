@@ -137,6 +137,7 @@ private:
     void endCommandBuffer(VkCommandBuffer commandBuffer);
     void createFillRectPipeline();
     void createImagePipeline();
+    void uploadImage(const Image& imagedata, VkImage& image, VkImageView& imageView, VkDeviceMemory& imageMemory);
 };
 
 // TODO: create a header for these constants
