@@ -30,6 +30,7 @@
 #include "gepard-engine-backend.h"
 #include "gepard-float.h"
 #include "gepard-image.h"
+#include "gepard-trapezoid-tessellator.h"
 #include "gepard-vulkan-container.h"
 #include "gepard-vulkan-interface.h"
 #include "gepard.h"
@@ -53,7 +54,7 @@ public:
     virtual void drawImage(const Image& imagedata, const Float sx, const Float sy, const Float sw, const Float sh, const Float dx, const Float dy, const Float dw, const Float dh) override;
     virtual void putImage(const Image& imagedata, const Float dx, const Float dy, const Float dirtyX, const Float dirtyY, const Float dirtyWidth, const Float dirtyHeight) override;
     virtual Image getImage(const Float sx, const Float sy, const Float sw, const Float sh) override;
-    virtual void fillPath(PathData*, const GepardState&) override;
+    virtual void fillPath(PathData* pathData, const GepardState& state) override;
     virtual void strokePath() override;
 
     // Experimental
@@ -139,6 +140,7 @@ private:
     void createFillRectPipeline();
     void createImagePipeline();
     void uploadImage(const Image& imagedata, VkImage& image, VkImageView& imageView, VkDeviceMemory& imageMemory);
+    void generatePathVertexData(const TrapezoidList& trapezoidList, std::vector<float>& vertexData, std::vector<uint32_t>& rectIndices);
 };
 
 // TODO: create a header for these constants

@@ -27,6 +27,8 @@
 
 #include "gepard-float.h"
 #include "gepard-logging.h"
+#include "gepard-stroke-builder.h"
+#include "gepard-trapezoid-tessellator.h"
 #include "gepard-vulkan-container.h"
 #include <cstring>
 #include <fstream>
@@ -580,15 +582,114 @@ Image GepardVulkan::getImage(const Float sx, const Float sy, const Float sw, con
     return Image(w, h, imageData);
 }
 
-void GepardVulkan::fillPath(PathData*, const GepardState&)
+void GepardVulkan::fillPath(PathData* pathData, const GepardState& state)
 {
-    GD_NOT_IMPLEMENTED();
+    GD_LOG(DEBUG) << "Fill path";
+    GD_LOG(TRACE) << "Start TrapezoidTessalator";
+    TrapezoidTessellator::FillRule fillRule = TrapezoidTessellator::FillRule::NonZero;
+    TrapezoidTessellator tt(*pathData, fillRule, /*GD_ANTIALIAS_LEVEL*/ 2);
+    const TrapezoidList trapezoidList = tt.trapezoidList(state);
+    GD_LOG(TRACE) << "TrapezoidTessalator is finished.";
+    std::vector<float> vertexData;
+    std::vector<uint32_t> indicies;
+    generatePathVertexData(trapezoidList, vertexData, indicies);
+
+    // TODO: this is copied from the fillRect, move the same code into separate function
+    // Vertex data setup
+    const float r = _context.currentState().fillColor.r;
+    const float g = _context.currentState().fillColor.g;
+    const float b = _context.currentState().fillColor.b;
+    const float a = _context.currentState().fillColor.a;
+
+    const float instanceData[] = {
+        r, g, b, a,
+    };
+
+    std::vector<float> pushConstants = getTransformationMatrix();
+    pushConstants.push_back(_context.surface->width());
+    pushConstants.push_back(_context.surface->height());
+    const uint32_t pushConstantsSize = pushConstants.size() * sizeof(float);
+
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkMemoryRequirements vertexMemoryRequirements;
+    VkDeviceSize vertexBufferOffset = 0;
+    VkBuffer instanceBuffer;
+    VkDeviceMemory instanceBufferMemory;
+    VkMemoryRequirements instanceMemoryRequirements;
+    VkDeviceSize instanceBufferOffset = 0;
+
+    createBuffer(vertexBuffer, vertexBufferMemory, vertexMemoryRequirements, vertexData.size() * sizeof(float), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    _drawResContainer->addElement(new GepardVkBufferElement(vertexBuffer, vertexBufferMemory));
+    uploadToDeviceMemory(vertexBufferMemory, (void*)vertexData.data(), vertexMemoryRequirements.size, vertexBufferOffset);
+
+    createBuffer(instanceBuffer, instanceBufferMemory, instanceMemoryRequirements, (VkDeviceSize)sizeof(instanceData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    _drawResContainer->addElement(new GepardVkBufferElement(instanceBuffer, instanceBufferMemory));
+    uploadToDeviceMemory(instanceBufferMemory, (void*)instanceData, instanceMemoryRequirements.size, instanceBufferOffset);
+
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+    VkMemoryRequirements indexMemoryRequirements;
+
+    createBuffer(indexBuffer, indexBufferMemory, indexMemoryRequirements, indicies.size() * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    _drawResContainer->addElement(new GepardVkBufferElement(indexBuffer, indexBufferMemory));
+    uploadToDeviceMemory(indexBufferMemory, (void*)indicies.data(), indexMemoryRequirements.size);
+
+    GepardVKPipelineElement* pipelineElement = _pipelines["fillRect"];
+    VkPipelineLayout layout = pipelineElement->layout();
+    VkPipeline pipeline = pipelineElement->pipeline();
+
+    // Drawing
+    const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
+
+    beginCommandBuffer(commandBuffer);
+
+    const VkRenderPassBeginInfo renderPassInfo = {
+        VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,   // VkStructureType        sType;
+        nullptr,                                    // const void*            pNext;
+        _renderPass,                                // VkRenderPass           renderPass;
+        _frameBuffer,                               // VkFramebuffer          framebuffer;
+        getDefaultRenderArea(),                     // VkRect2D               renderArea;
+        0u,                                         // uint32_t               clearValueCount;
+        nullptr,                                    // const VkClearValue*    pClearValues;
+    };
+
+    _vk.vkCmdPushConstants(commandBuffer, layout, VK_SHADER_STAGE_VERTEX_BIT, 0u, pushConstantsSize, pushConstants.data());
+    _vk.vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    _vk.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    _vk.vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, &vertexBufferOffset);
+    _vk.vkCmdBindVertexBuffers(commandBuffer, 1, 1, &instanceBuffer, &instanceBufferOffset);
+    _vk.vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    _vk.vkCmdDrawIndexed(commandBuffer, indicies.size(), 1, 0, 0, 0);
+
+    _vk.vkCmdEndRenderPass(commandBuffer);
+
+    if (_context.presentMode == Gepard::PresentImmediate) {
+        finish();
+    }
 }
 
 void GepardVulkan::strokePath()
 {
-    GD_NOT_IMPLEMENTED();
-}
+    // TODO: direct copy of the GLES2 counterpart, this should be moved to engineBackend
+    PathData* pathData = _context.path.pathData();
+    GepardState& state = _context.currentState();
+
+    GD_LOG(DEBUG) << "Path: " << pathData->firstElement();
+    if (!pathData || pathData->isEmpty())
+        return;
+
+    Float miterLimit = state.miterLimit ? state.miterLimit : 10;
+
+    StrokePathBuilder sPath(state.lineWitdh, miterLimit, state.lineJoinMode, state.lineCapMode);
+    sPath.convertStrokeToFill(pathData);
+
+    Color tempColor = state.fillColor;
+    state.fillColor = state.strokeColor;
+    fillPath(sPath.pathData(), state);
+    state.fillColor = tempColor;}
 
 void GepardVulkan::finish()
 {
@@ -2039,6 +2140,29 @@ void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageVi
         finish();
     }
     _nativeImages[key] = new GepardVkImageElement(image, imageView, imageMemory);
+}
+
+void GepardVulkan::generatePathVertexData(const TrapezoidList &trapezoidList, std::vector<float> &vertexData, std::vector<uint32_t> &rectIndices)
+{
+    uint32_t i = 0;
+    for (const Trapezoid& trapezoid : trapezoidList) {
+        vertexData.push_back(trapezoid.topLeftX);
+        vertexData.push_back(trapezoid.topY);
+        vertexData.push_back(trapezoid.topRightX);
+        vertexData.push_back(trapezoid.topY);
+        vertexData.push_back(trapezoid.bottomLeftX);
+        vertexData.push_back(trapezoid.bottomY);
+        vertexData.push_back(trapezoid.bottomRightX);
+        vertexData.push_back(trapezoid.bottomY);
+
+        rectIndices.push_back(i);
+        rectIndices.push_back(i + 1);
+        rectIndices.push_back(i + 2);
+        rectIndices.push_back(i + 2);
+        rectIndices.push_back(i + 1);
+        rectIndices.push_back(i + 3);
+        i += 4;
+    }
 }
 
 } // namespace vulkan
