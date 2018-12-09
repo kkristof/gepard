@@ -94,6 +94,10 @@ private:
     std::map<std::string, GepardVKPipelineElement*> _pipelines;
     std::map<size_t, GepardVkImageElement*> _nativeImages;
     bool _commandBufferPending = false;
+    VkSampleCountFlagBits _msaaSampleCount;
+    bool _msaaSampleShading;
+    float _msaaMinSampleShading;
+    VkImage _resolvedImage;
 
     void createDefaultInstance();
     void chooseDefaultPhysicalDevice();
@@ -112,7 +116,7 @@ private:
     void readImage(uint32_t* memoryBuffer, int32_t x, int32_t y, uint32_t width, uint32_t height);
 
     void createBuffer(VkBuffer& buffer, VkDeviceMemory& bufferAlloc, VkMemoryRequirements& bufferRequirements, VkDeviceSize size, VkBufferUsageFlags usageFlag);
-    void createImage(VkImage& image, VkDeviceMemory& imageAlloc, VkMemoryRequirements& memReq, VkExtent3D size, VkImageUsageFlags usageFlag);
+    void createImage(VkImage& image, VkDeviceMemory& imageAlloc, VkMemoryRequirements& memReq, VkExtent3D imageSize, VkImageUsageFlags usageFlag, VkSampleCountFlagBits msaaSampleCount = VK_SAMPLE_COUNT_1_BIT);
     void createImageView(VkImageView& imageView, VkImage image);
     void createShaderModule(VkShaderModule& shader, const uint32_t* code, const size_t codeSize);
 

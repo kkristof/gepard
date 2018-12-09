@@ -75,6 +75,9 @@ GepardVulkan::GepardVulkan(GepardContext& context)
     , _wsiSurface(0)
     , _wsiSwapChain(0)
     , _currentCommandBuffer(0u)
+    , _msaaSampleCount(VK_SAMPLE_COUNT_4_BIT)
+    , _msaaSampleShading(true)
+    , _msaaMinSampleShading(1.0)
 {
     GD_LOG(INFO) << "Initialize GepardVulkan";
     _vk.loadGlobalFunctions();
@@ -113,6 +116,9 @@ GepardVulkan::~GepardVulkan()
     }
     if (_surfaceImage) {
         _vk.vkDestroyImage(_device, _surfaceImage, _allocator);
+    }
+    if (_resolvedImage) {
+        _vk.vkDestroyImage(_device, _resolvedImage, _allocator);
     }
     if (_renderPass) {
         _vk.vkDestroyRenderPass(_device, _renderPass, _allocator);
@@ -587,7 +593,7 @@ void GepardVulkan::fillPath(PathData* pathData, const GepardState& state)
     GD_LOG(DEBUG) << "Fill path";
     GD_LOG(TRACE) << "Start TrapezoidTessalator";
     TrapezoidTessellator::FillRule fillRule = TrapezoidTessellator::FillRule::NonZero;
-    TrapezoidTessellator tt(*pathData, fillRule, /*GD_ANTIALIAS_LEVEL*/ 2);
+    TrapezoidTessellator tt(*pathData, fillRule, /*GD_ANTIALIAS_LEVEL*/ 4);
     const TrapezoidList trapezoidList = tt.trapezoidList(state);
     GD_LOG(TRACE) << "TrapezoidTessalator is finished.";
     std::vector<float> vertexData;
@@ -899,7 +905,7 @@ void GepardVulkan::createDefaultRenderPass()
     const VkAttachmentDescription attachmentDescription = {
         0u,                                         // VkAttachmentDescriptionFlags flags;
         _imageFormat,                               // VkFormat                     format;
-        VK_SAMPLE_COUNT_1_BIT,                      // VkSampleCountFlagBits        samples;
+        _msaaSampleCount,                           // VkSampleCountFlagBits        samples;
         VK_ATTACHMENT_LOAD_OP_LOAD,                 // VkAttachmentLoadOp           loadOp;
         VK_ATTACHMENT_STORE_OP_STORE,               // VkAttachmentStoreOp          storeOp;
         VK_ATTACHMENT_LOAD_OP_DONT_CARE,            // VkAttachmentLoadOp           stencilLoadOp;
@@ -951,14 +957,22 @@ void GepardVulkan::createSurfaceImage()
         _context.surface->height(), // uint32_t    height;
         1u,                         // uint32_t    depth;
     };
+    {
+        VkDeviceMemory deviceMemory;
+        VkMemoryRequirements memoryRequirements;
+        VkImageUsageFlags usageFlag = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    VkDeviceMemory deviceMemory;
-    VkMemoryRequirements memoryRequirements;
-    VkImageUsageFlags usageFlag = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        createImage(_surfaceImage, deviceMemory, memoryRequirements, imageSize, usageFlag, _msaaSampleCount);
+        _memoryAllocations.push_back(deviceMemory);
+    }
+    {
+        VkDeviceMemory deviceMemory;
+        VkMemoryRequirements memoryRequirements;
+        VkImageUsageFlags usageFlag = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    createImage(_surfaceImage, deviceMemory, memoryRequirements, imageSize, usageFlag);
-    _memoryAllocations.push_back(deviceMemory);
-
+        createImage(_resolvedImage, deviceMemory, memoryRequirements, imageSize, usageFlag);
+        _memoryAllocations.push_back(deviceMemory);
+    }
     // Clear the surface image
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
 
@@ -1148,7 +1162,7 @@ void GepardVulkan::createSwapChain()
     uint32_t swapchainImagesCount = surfaceCapabilities.minImageCount + 1;
 
     uint32_t presentModeCount;
-    _vk.vkGetPhysicalDeviceSurfacePresentModesKHR(_physicalDevice, _wsiSurface, &presentModeCount, NULL);
+    _vk.vkGetPhysicalDeviceSurfacePresentModesKHR(_physicalDevice, _wsiSurface, &presentModeCount, nullptr);
     std::vector<VkPresentModeKHR> presentModes(presentModeCount);
     _vk.vkGetPhysicalDeviceSurfacePresentModesKHR(_physicalDevice, _wsiSurface, &presentModeCount, presentModes.data());
 
@@ -1178,7 +1192,7 @@ void GepardVulkan::createSwapChain()
         0u,                                             // uint32_t                         queueFamilyIndexCount;
         nullptr,                                        // const uint32_t*                  pQueueFamilyIndices;
         surfaceCapabilities.currentTransform,           // VkSurfaceTransformFlagBitsKHR    preTransform;
-        VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,             // VkCompositeAlphaFlagBitsKHR      compositeAlpha;
+        VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,              // VkCompositeAlphaFlagBitsKHR      compositeAlpha;
         swapchainPresentMode,                           // VkPresentModeKHR                 presentMode;
         VK_TRUE,                                        // VkBool32                         clipped;
         VK_NULL_HANDLE,                                 // VkSwapchainKHR                   oldSwapchain;
@@ -1257,6 +1271,20 @@ void GepardVulkan::presentImage()
         1u,                         // uint32_t              layerCount;
     };
 
+    const VkExtent3D extent = {
+        _context.surface->width(),  // uint32_t    x;
+        _context.surface->height(), // uint32_t    y;
+        1u,                         // uint32_t    z;
+    };
+
+    const VkImageResolve imageResolve = {
+        subresource,        // VkImageSubresourceLayers    srcSubresource;
+        topLeftCorner,      // VkOffset3D                  srcOffset;
+        subresource,        // VkImageSubresourceLayers    dstSubresource;
+        topLeftCorner,      // VkOffset3D                  dstOffset;
+        extent,             // VkExtent3D                  extent;
+    };
+
     const VkImageMemoryBarrier preCopyBarrierFBO = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
         nullptr,                                    // const void*                pNext;
@@ -1280,6 +1308,32 @@ void GepardVulkan::presentImage()
         VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
         VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
         _surfaceImage,                              // VkImage                    image;
+        subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
+    };
+
+    const VkImageMemoryBarrier preImageResolveBarrier = {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
+        VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              srcAccessMask;
+        VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags              dstAccessMask;
+        VK_IMAGE_LAYOUT_UNDEFINED,                  // VkImageLayout              oldLayout;
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       // VkImageLayout              newLayout;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
+        _resolvedImage,                             // VkImage                    image;
+        subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
+    };
+
+    const VkImageMemoryBarrier postImageResolveBarrier = {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
+        VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags              srcAccessMask;
+        VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              dstAccessMask;
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       // VkImageLayout              oldLayout;
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,       // VkImageLayout              newLayout;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
+        _resolvedImage,                             // VkImage                    image;
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
@@ -1315,6 +1369,7 @@ void GepardVulkan::presentImage()
     const VkImageMemoryBarrier preCopyBarriers[] = {
         preCopyBarrierFBO,
         preCopyBarrierWSI,
+        preImageResolveBarrier,
     };
 
     const VkImageMemoryBarrier postCopyBarriers[] = {
@@ -1322,8 +1377,10 @@ void GepardVulkan::presentImage()
         postCopyBarrierWSI,
     };
     _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
-    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 2, preCopyBarriers);
-    _vk.vkCmdBlitImage(commandBuffer, _surfaceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _wsiSwapChainImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy, VK_FILTER_NEAREST);
+    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 3, preCopyBarriers);
+    _vk.vkCmdResolveImage(commandBuffer, _surfaceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _resolvedImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageResolve);
+    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &postImageResolveBarrier);
+    _vk.vkCmdBlitImage(commandBuffer, _resolvedImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _wsiSwapChainImages[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy, VK_FILTER_NEAREST);
     _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 2, postCopyBarriers);
     _vk.vkEndCommandBuffer(commandBuffer);
     const VkSubmitInfo submitInfo = {
@@ -1420,6 +1477,32 @@ void GepardVulkan::readImage(uint32_t* memoryBuffer, int32_t x, int32_t y, uint3
         subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
     };
 
+    const VkImageMemoryBarrier preImageResolveBarrier = {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
+        VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              srcAccessMask;
+        VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags              dstAccessMask;
+        VK_IMAGE_LAYOUT_UNDEFINED,                  // VkImageLayout              oldLayout;
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       // VkImageLayout              newLayout;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
+        _resolvedImage,                             // VkImage                    image;
+        subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
+    };
+
+    const VkImageMemoryBarrier postImageResolveBarrier = {
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,     // VkStructureType            sType;
+        nullptr,                                    // const void*                pNext;
+        VK_ACCESS_TRANSFER_WRITE_BIT,               // VkAccessFlags              srcAccessMask;
+        VK_ACCESS_TRANSFER_READ_BIT,                // VkAccessFlags              dstAccessMask;
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       // VkImageLayout              oldLayout;
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,       // VkImageLayout              newLayout;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   srcQueueFamilyIndex;
+        VK_QUEUE_FAMILY_IGNORED,                    // uint32_t                   dstQueueFamilyIndex;
+        _resolvedImage,                             // VkImage                    image;
+        subresourceRange,                           // VkImageSubresourceRange    subresourceRange;
+    };
+
     const VkBufferMemoryBarrier bufferBarrier = {
         VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,    // VkStructureType    sType;
         nullptr,                                    // const void*        pNext;
@@ -1439,21 +1522,33 @@ void GepardVulkan::readImage(uint32_t* memoryBuffer, int32_t x, int32_t y, uint3
         1u,                         // uint32_t              baseArrayLayer;
     };
 
+    const VkOffset3D offset = {
+        x,      // int32_t    x;
+        y,      // int32_t    y;
+        0       // int32_t    z;
+    };
+
+    const VkExtent3D extent = {
+        width,  // uint32_t    width;
+        height, // uint32_t    height;
+        1u,     // uint32_t    depth;
+    };
+
+    const VkImageResolve imageResolve = {
+        imageSubresource,   // VkImageSubresourceLayers    srcSubresource;
+        offset,             // VkOffset3D                  srcOffset;
+        imageSubresource,   // VkImageSubresourceLayers    dstSubresource;
+        offset,             // VkOffset3D                  dstOffset;
+        extent,             // VkExtent3D                  extent;
+    };
+
     const VkBufferImageCopy copyRegion = {
         0u,                 // VkDeviceSize                bufferOffset;
         width,              // uint32_t                    bufferRowLength;
         height,             // uint32_t                    bufferImageHeight;
         imageSubresource,   // VkImageSubresourceLayers    imageSubresource;
-        {
-            x,      // int32_t    x;
-            y,      // int32_t    y;
-            0       // int32_t    z;
-        },                  // VkOffset3D                  imageOffset;
-        {
-            width,  // uint32_t    width;
-            height, // uint32_t    height;
-            1u,     // uint32_t    depth;
-        },                  // VkExtent3D                  imageExtent;
+        offset,             // VkOffset3D                  imageOffset;
+        extent,             // VkExtent3D                  imageExtent;
     };
 
     const VkCommandBufferBeginInfo commandBufferBeginInfo = {
@@ -1463,11 +1558,15 @@ void GepardVulkan::readImage(uint32_t* memoryBuffer, int32_t x, int32_t y, uint3
        nullptr,                                     // const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
     };
 
-    _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    VkImageMemoryBarrier preResolve[] = { preImageBarrier, preImageResolveBarrier };
+    VkImageMemoryBarrier postResolve[] = { postImageBarrier, postImageResolveBarrier };
 
-    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 1, &preImageBarrier);
-    _vk.vkCmdCopyImageToBuffer(commandBuffer, _surfaceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &copyRegion);
-    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 1, &bufferBarrier, 1, &postImageBarrier);
+    _vk.vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 2, preResolve);
+    _vk.vkCmdResolveImage(commandBuffer, _surfaceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _resolvedImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageResolve);
+    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 0, (const VkBufferMemoryBarrier*)nullptr, 2, postResolve);
+    _vk.vkCmdCopyImageToBuffer(commandBuffer, _resolvedImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &copyRegion);
+    _vk.vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)nullptr, 1, &bufferBarrier, 0, nullptr);
     _vk.vkEndCommandBuffer(commandBuffer);
 
     const VkSubmitInfo submitInfo = {
@@ -1552,7 +1651,7 @@ void GepardVulkan::createBuffer(VkBuffer &buffer, VkDeviceMemory &bufferAlloc, V
     _vk.vkBindBufferMemory(_device, buffer, bufferAlloc, 0);
 }
 
-void GepardVulkan::createImage(VkImage &image, VkDeviceMemory &imageAlloc, VkMemoryRequirements &memReq, VkExtent3D imageSize, VkImageUsageFlags usageFlag)
+void GepardVulkan::createImage(VkImage &image, VkDeviceMemory &imageAlloc, VkMemoryRequirements &memReq, VkExtent3D imageSize, VkImageUsageFlags usageFlag, VkSampleCountFlagBits msaaSampleCount)
 {
     VkResult vkResult;
     (void) vkResult;
@@ -1565,7 +1664,7 @@ void GepardVulkan::createImage(VkImage &image, VkDeviceMemory &imageAlloc, VkMem
         imageSize,                                  // VkExtent3D               extent;
         1u,                                         // uint32_t                 mipLevels;
         1u,                                         // uint32_t                 arrayLayers;
-        VK_SAMPLE_COUNT_1_BIT,                      // VkSampleCountFlagBits    samples;
+        msaaSampleCount,                            // VkSampleCountFlagBits    samples;
         VK_IMAGE_TILING_OPTIMAL,                    // VkImageTiling            tiling;
         usageFlag,                                  // VkImageUsageFlags        usage;
         VK_SHARING_MODE_EXCLUSIVE,                  // VkSharingMode            sharingMode;
@@ -1785,9 +1884,9 @@ void GepardVulkan::createSimplePipeline(VkPipeline &pipeline, VkPipelineLayout &
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,   // VkStructureType                          sType;
         nullptr,                                                    // const void*                              pNext;
         0,                                                          // VkPipelineMultisampleStateCreateFlags    flags;
-        VK_SAMPLE_COUNT_1_BIT,                                      // VkSampleCountFlagBits                    rasterizationSamples;
-        VK_FALSE,                                                   // VkBool32                                 sampleShadingEnable;
-        0.0,                                                        // float                                    minSampleShading;
+        _msaaSampleCount,                                           // VkSampleCountFlagBits                    rasterizationSamples;
+        _msaaSampleShading,                                         // VkBool32                                 sampleShadingEnable;
+        _msaaMinSampleShading,                                      // float                                    minSampleShading;
         nullptr,                                                    // const VkSampleMask*                      pSampleMask;
         VK_FALSE,                                                   // VkBool32                                 alphaToCoverageEnable;
         VK_FALSE,                                                   // VkBool32                                 alphaToOneEnable;
