@@ -575,7 +575,7 @@ void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float 
     }
 }
 
-Image GepardVulkan::getImage(const Float sx, const Float sy, const Float sw, const Float sh)
+const Image GepardVulkan::getImage(const Float sx, const Float sy, const Float sw, const Float sh)
 {
     std::vector<uint32_t> imageData;
     int32_t x = sx;
