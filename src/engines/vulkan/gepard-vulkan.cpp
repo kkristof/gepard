@@ -451,7 +451,7 @@ void GepardVulkan::putImage(const Image& imagedata, const Float dx, const Float 
     };
 
     createImage(image, imageMemory, imageMemoryRequirements, imageSize, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    _drawResContainer->addElement(new GepardVkImageElement(image, 0u, imageMemory));
+    _drawResContainer->addElement(new GepardVkImageElement(image, 0u, imageMemory, std::chrono::high_resolution_clock::now()));
     const VkCommandBuffer commandBuffer = _primaryCommandBuffers[0];
     beginCommandBuffer(commandBuffer);
 
@@ -2204,11 +2204,16 @@ void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageVi
     auto iterator = _nativeImages.find(key);
     if (iterator != _nativeImages.end()) {
         GepardVkImageElement* imageElement = iterator->second;
-        image = imageElement->getImage();
-        imageView = imageElement->getImageView();
-        imageMemory = imageElement->getMemory();
-        GD_LOG(DEBUG) << "Image found in the images";
-        return;
+        if (imagedata.timeStamp() == imageElement->getTimeStamp()) {
+            image = imageElement->getImage();
+            imageView = imageElement->getImageView();
+            imageMemory = imageElement->getMemory();
+            GD_LOG(DEBUG) << "Image found in the images";
+            return;
+        }
+        // Remove invalidated image from the image cache
+        imageElement->destroyElement(_vk, _device, _allocator);
+        _nativeImages.erase(iterator);
     }
     const uint32_t width = imagedata.width();
     const uint32_t height = imagedata.height();
@@ -2238,7 +2243,7 @@ void GepardVulkan::uploadImage(const Image &imagedata, VkImage &image, VkImageVi
     if (_context.presentMode == Gepard::PresentImmediate) {
         finish();
     }
-    _nativeImages[key] = new GepardVkImageElement(image, imageView, imageMemory);
+    _nativeImages[key] = new GepardVkImageElement(image, imageView, imageMemory, imagedata.timeStamp());
 }
 
 void GepardVulkan::generatePathVertexData(const TrapezoidList &trapezoidList, std::vector<float> &vertexData, std::vector<uint32_t> &rectIndices)

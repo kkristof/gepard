@@ -26,6 +26,7 @@
 #ifndef GEPARD_IMAGE_H
 #define GEPARD_IMAGE_H
 
+#include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -39,14 +40,17 @@ public:
     Image(const uint32_t width, const uint32_t height, const std::vector<uint32_t>& data);
     virtual ~Image();
 
-    const uint32_t width() const;
-    const uint32_t height() const;
+    uint32_t width() const;
+    uint32_t height() const;
     const std::vector<uint32_t> &data() const;
+    std::chrono::high_resolution_clock::time_point timeStamp() const;
+    void invalidate();
 
 private:
     uint32_t _width;
     uint32_t _height;
     std::vector<uint32_t> _data;
+    std::chrono::high_resolution_clock::time_point _timeStamp;
 };
 
 namespace utils {

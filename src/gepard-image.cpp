@@ -26,6 +26,7 @@
 #include "gepard-image.h"
 
 #include "gepard-logging.h"
+#include <chrono>
 #include <cstring>
 #include <png.h>
 
@@ -42,6 +43,7 @@ Image::Image(uint32_t width, uint32_t height)
     , _height(height)
 {
     _data.resize(width * height);
+    this->invalidate();
 }
 
 Image::Image(const uint32_t width, const uint32_t height, const std::vector<uint32_t>& data)
@@ -49,18 +51,19 @@ Image::Image(const uint32_t width, const uint32_t height, const std::vector<uint
     , _height(height)
     , _data(data)
 {
+    this->invalidate();
 }
 
 Image::~Image()
 {
 }
 
-const uint32_t Image::width() const
+uint32_t Image::width() const
 {
     return _width;
 }
 
-const uint32_t Image::height() const
+uint32_t Image::height() const
 {
     return _height;
 }
@@ -68,6 +71,16 @@ const uint32_t Image::height() const
 const std::vector<uint32_t> &Image::data() const
 {
     return _data;
+}
+
+std::chrono::system_clock::time_point Image::timeStamp() const
+{
+    return _timeStamp;
+}
+
+void Image::invalidate()
+{
+    _timeStamp = std::chrono::high_resolution_clock::now();
 }
 
 bool utils::savePng(const Image &image, const std::string& fileName)

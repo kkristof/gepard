@@ -28,10 +28,11 @@
 namespace gepard {
 namespace vulkan {
 
-GepardVkImageElement::GepardVkImageElement(VkImage image, VkImageView imageView, VkDeviceMemory memory)
+GepardVkImageElement::GepardVkImageElement(VkImage image, VkImageView imageView, VkDeviceMemory memory, std::chrono::system_clock::time_point timeStamp)
     : _image(image)
     , _imageView(imageView)
     , _imageMemory(memory)
+    , _timeStamp(timeStamp)
 {
 }
 
@@ -55,6 +56,11 @@ VkImageView GepardVkImageElement::getImageView()
 VkDeviceMemory GepardVkImageElement::getMemory()
 {
     return _imageMemory;
+}
+
+std::chrono::system_clock::time_point GepardVkImageElement::getTimeStamp()
+{
+    return _timeStamp;
 }
 
 VkBaseElement::VkBaseElement()

@@ -27,6 +27,7 @@
 #define GEPARD_VULKAN_CONTAINERS_H
 
 #include "gepard-vulkan-interface.h"
+#include <chrono>
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -45,16 +46,18 @@ public:
 class GepardVkImageElement : virtual public VkBaseElement
 {
 public:
-    GepardVkImageElement(VkImage image, VkImageView imageView, VkDeviceMemory memory);
+    GepardVkImageElement(VkImage image, VkImageView imageView, VkDeviceMemory memory, std::chrono::system_clock::time_point timeStamp);
 
     virtual void destroyElement(GepardVulkanInterface &vk, VkDevice &device, VkAllocationCallbacks* allocator) override;
     VkImage getImage();
     VkImageView getImageView();
     VkDeviceMemory getMemory();
+    std::chrono::system_clock::time_point getTimeStamp();
 private:
     VkImage _image;
     VkImageView _imageView;
     VkDeviceMemory _imageMemory;
+    std::chrono::system_clock::time_point _timeStamp;
 };
 
 class GepardVkBufferElement : virtual public VkBaseElement
